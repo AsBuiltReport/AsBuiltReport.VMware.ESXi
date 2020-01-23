@@ -24,14 +24,14 @@
 # Getting Started
 Below are the instructions on how to install, configure and generate a VMware ESXi As Built report.
 
-## Supported vSphere Versions
+## Supported ESXi Versions
 The VMware ESXi As Built Report supports the following ESXi versions;
-- vSphere 5.0
-- vSphere 5.1
-- vSphere 5.5
-- vSphere 6.0
-- vSphere 6.5
-- vSphere 6.7
+- ESXi 5.0
+- ESXi 5.1
+- ESXi 5.5
+- ESXi 6.0
+- ESXi 6.5
+- ESXi 6.7
 
 ## Pre-requisites
 The following PowerShell modules are required for generating a VMware ESXi As Built report.
