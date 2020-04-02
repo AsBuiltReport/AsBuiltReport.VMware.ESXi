@@ -164,8 +164,8 @@ PS C:\> $Creds = Get-Credential
 PS C:\> New-AsBuiltReport -Report VMware.ESXi -Target 'esxi-01.corp.local' -Credential $Creds -Format Html,Text -OutputPath 'C:\Users\Tim\Documents' -EnableHealthCheck
 
 # Generate a single ESXi As Built Report for ESXi servers 'esxi-01.corp.local' and 'esxi-02.corp.local' using specified credentials. Report exports to Word format by default. Apply custom style to the report. Reports are saved to the user profile folder by default.
-PS C:\> New-AsBuiltReport -Report Vmware.ESXi -Target 'esxi-01.corp.local','esxi-02.corp.local' -Username 'root' -Password 'VMware1!' -StylePath C:\Scripts\Styles\MyCustomStyle.ps1
+PS C:\> New-AsBuiltReport -Report VMware.ESXi -Target 'esxi-01.corp.local','esxi-02.corp.local' -Username 'root' -Password 'VMware1!' -StylePath C:\Scripts\Styles\MyCustomStyle.ps1
 
 # Generate an ESXi As Built Report for ESXi server 'vcenter-01.corp.local' using specified credentials. Export report to HTML & DOCX formats. Use default report style. Reports are saved to the user profile folder by default. Attach and send reports via e-mail.
-PS C:\> New-AsBuiltReport -Report Vmware.ESXi -Target 'esxi-01.corp.local' -Username 'root' -Password 'VMware1!' -Format Html,Word -OutputPath C:\Users\Tim\Documents -SendEmail
+PS C:\> New-AsBuiltReport -Report VMware.ESXi -Target 'esxi-01.corp.local' -Username 'root' -Password 'VMware1!' -Format Html,Word -OutputPath C:\Users\Tim\Documents -SendEmail
 ```
