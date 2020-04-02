@@ -101,10 +101,10 @@ There are 6 levels (0-5) of detail granularity for each section as follows;
 | Setting | InfoLevel | Description |
 | ------- | ---- | ----------- |
 | 0 | Disabled | does not collect or display any information
-| 1 | Summary** | provides summarised information for a collection of objects
+| 1 | Summary | provides summarised information for a collection of objects
 | 2 | Informative | provides condensed, detailed information for a collection of objects
 | 3 | Detailed | provides detailed information for individual objects
-| 4 | Adv Detailed | provides detailed information for individual objects, as well as information for associated objects (Hosts, Clusters, Datastores, VMs etc)
+| 4 | Adv Detailed | provides detailed information for individual objects, as well as information for associated objects (Hosts, Datastores, VMs etc)
 | 5 | Comprehensive | provides comprehensive information for individual objects, such as advanced configuration settings
 
 ### Healthcheck
