@@ -1,0 +1,47 @@
+{
+    "Report": {
+        "Name": "VMware ESXi As Built Report",
+        "Version": "1.0",
+        "Status": "Released"
+    },
+    "Options": {
+        "ShowLicenseKeys": false,
+        "ShowVMSnapshots": true
+    },
+    "InfoLevel": {
+        "_comment_": "0 = Disabled, 1 = Summary, 2 = Informative, 3 = Detailed, 4 = Adv Detailed, 5 = Comprehensive",
+        "VMHost": 3,
+        "Network": 3,
+        "Datastore": 3,
+        "VM": 3
+    },
+    "HealthCheck": {
+        "VMHost": {
+            "ConnectionState": true,
+            "HyperThreading": true,
+            "ScratchLocation": true,
+            "IPv6": true,
+            "UpTimeDays": true,
+            "Licensing": true,
+            "SSH": true,
+            "ESXiShell": true,
+            "NTP": true,
+            "StorageAdapter": true,
+            "NetworkAdapter": true,
+            "LockdownMode": true
+        },
+        "Datastore": {
+            "CapacityUtilization": true
+        },
+        "VM": {
+            "PowerState": true,
+            "ConnectionState": true,
+            "CpuHotAdd": true,
+            "CpuHotRemove": true,
+            "MemoryHotAdd": true,
+            "ChangeBlockTracking": true,
+            "VMToolsStatus": true,
+            "VMSnapshots": true
+        }
+    }
+}
