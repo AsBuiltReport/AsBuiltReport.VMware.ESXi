@@ -26,6 +26,8 @@
             "SSH": true,
             "ESXiShell": true,
             "NTP": true,
+            "StorageAdapter": true,
+            "NetworkAdapter": true,
             "LockdownMode": true
         },
         "Datastore": {

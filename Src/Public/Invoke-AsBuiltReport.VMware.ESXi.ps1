@@ -5,7 +5,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
     .DESCRIPTION
         Documents the configuration of VMware ESXi servers in Word/HTML/XML/Text formats using PScribo.
     .NOTES
-        Version:        0.1.0
+        Version:        1.0.0
         Author:         Tim Carman
         Twitter:        @tpcarman
         Github:         tpcarman
@@ -375,7 +375,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
     .PARAMETER esxcli
     Esxcli session object associated to the host.
     .EXAMPLE
-    $Credentials = Get-Crendentials
+    $Credentials = Get-Credential
     $Server = Connect-VIServer -Server vcenter01.example.com -Credentials $Credentials
     $VMHost = Get-VMHost -Server $Server -Name esx01.example.com
     $esxcli = Get-EsxCli -Server $Server -VMHost $VMHost -V2
@@ -549,7 +549,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                     'Bios Release Date' = $VMHost.ExtensionData.Hardware.BiosInfo.ReleaseDate 
                                     'ESXi Version' = $VMHost.Version 
                                     'ESXi Build' = $VMHost.build 
-                                    'Product' = $VMHostLicense.Product 
+                                    'Product' = $VMHostLicense.Product -join ', '
                                     'License Key' = $VMHostLicense.LicenseKey
                                     'License Expiration' = $VMHostLicense.Expiration 
                                     'Boot Time' = ($VMHost.ExtensionData.Runtime.Boottime).ToLocalTime()
@@ -899,6 +899,10 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                                     Add-Member @MemberProps -Name 'Port WWN' -Value (([String]::Format("{0:X}", $VMHostHba.PortWorldWideName) -split "(\w{2})" | Where-Object { $_ -ne "" }) -join ":")
                                                     Add-Member @MemberProps -Name 'Speed' -Value $VMHostHba.Speed
                                                 }
+                                                if ($Healthcheck.VMHost.StorageAdapter) {
+                                                    $VMHostStorageAdapter | Where-Object { $_.'Status' -ne 'Online' } | Set-Style -Style Warning -Property 'Status'
+                                                    $VMHostStorageAdapter | Where-Object { $_.'Status' -eq 'Offline' } | Set-Style -Style Critical -Property 'Status'
+                                                }
                                                 $VMHostStorageAdapter | Table -List -Name "$($VMHost.ExtensionData.Name) storage adapter $($VMHostStorageAdapter.Adapter)" -ColumnWidths 25, 75
                                             }
                                         }
@@ -971,7 +975,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                                 $null { 'Down' }
                                                 default {
                                                     if ($PhysicalNetAdapter.LinkSpeed.Duplex) {
-                                                        "$($PhysicalNetAdapter.LinkSpeed.SpeedMb) Mb, Full Duplex"
+                                                        "$($PhysicalNetAdapter.LinkSpeed.SpeedMb) Mbps, Full Duplex"
                                                     } else {
                                                         'Auto negotiate'
                                                     }
@@ -981,9 +985,9 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                                 $null { 'Auto negotiate' }
                                                 default {
                                                     if ($PhysicalNetAdapter.Spec.LinkSpeed.Duplex) {
-                                                        "$($PhysicalNetAdapter.Spec.LinkSpeed.SpeedMb) Mb, Full Duplex"
+                                                        "$($PhysicalNetAdapter.Spec.LinkSpeed.SpeedMb) Mbps, Full Duplex"
                                                     } else {
-                                                        "$($PhysicalNetAdapter.Spec.LinkSpeed.SpeedMb) Mb"
+                                                        "$($PhysicalNetAdapter.Spec.LinkSpeed.SpeedMb) Mbps"
                                                     }
                                                 }
                                             }
@@ -992,6 +996,10 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                                 $false { 'Not Supported' }
                                             }
                                         }
+                                    }
+                                    if ($Healthcheck.VMHost.NetworkAdapter) {
+                                        $VMHostPhysicalNetAdapters | Where-Object { $_.'Status' -ne 'Connected' } | Set-Style -Style Critical -Property 'Status'
+                                        $VMHostPhysicalNetAdapters | Where-Object { $_.'Actual Speed, Duplex' -eq 'Down' } | Set-Style -Style Critical -Property 'Actual Speed, Duplex'
                                     }
                                     if ($InfoLevel.VMHost -ge 4) {
                                         foreach ($VMHostPhysicalNetAdapter in $VMHostPhysicalNetAdapters) {
@@ -1658,6 +1666,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                         if ($InfoLevel.VM -ge 3) {
                                             foreach ($VM in $VMs) {
                                                 Section -Style Heading3 $VM.name {
+                                                    $VMUptime = @()
                                                     $VMUptime = Get-Uptime -VM $VM
                                                     $VMSpbmPolicy = $VMSpbmConfig | Where-Object { $_.entity -eq $vm }
                                                     $VMView = $VM | Get-View
@@ -1791,9 +1800,9 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                                                     [PSCustomObject]@{
                                                                         'Adapter' = $VMnic.Device
                                                                         'Connected' = $VMnic.Connected
-                                                                        'Network Name' = Switch -wildcard ($VMnic.NetworkName) {
-                                                                            'dvportgroup*' { $VDPortgroupLookup."$($VMnic.NetworkName)" }
-                                                                            default { $VMnic.NetworkName }
+                                                                        'Network Name' = Switch -wildcard ($VMnic.Device.NetworkName) {
+                                                                            'dvportgroup*' { $VDPortgroupLookup."$($VMnic.Device.NetworkName)" }
+                                                                            default { $VMnic.Device.NetworkName }
                                                                         }
                                                                         'Adapter Type' = $VMnic.Device.Type
                                                                         'IP Address' = $VMnic.IpAddress -join [Environment]::NewLine
