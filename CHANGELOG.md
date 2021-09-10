@@ -4,7 +4,7 @@
 
 ### Added
 - PowerShell 7 compatibility
-- PSScriptAnalyzer & PublishPSModule GitHub Action workflows
+- PSScriptAnalyzer & Release GitHub Action workflows
 - VMHost network adapter LLDP reporting
 - NSX TCP/IP stacks for VMkernel Adpater reporting
 - Include release and issue links in `CHANGELOG.md`
