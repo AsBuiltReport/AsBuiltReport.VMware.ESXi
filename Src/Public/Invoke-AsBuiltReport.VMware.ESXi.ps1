@@ -5,7 +5,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
     .DESCRIPTION
         Documents the configuration of VMware ESXi servers in Word/HTML/XML/Text formats using PScribo.
     .NOTES
-        Version:        1.1.0
+        Version:        1.1.2
         Author:         Tim Carman
         Twitter:        @tpcarman
         Github:         tpcarman
@@ -961,7 +961,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                             if ($VSSwitches) {
                                 #region Section Standard Virtual Switches
                                 Section -Style Heading5 'Standard Virtual Switches' {
-                                    Paragraph "The following section details the standard virtual switch configuration for $VMHost."
+                                    Paragraph "The following section details the standard virtual switch configuration for $($VMHost.ExtensionData.Name)."
                                     BlankLine
                                     $VSSwitchNicTeaming = $VSSwitches | Get-NicTeamingPolicy
                                     #region ESXi Host Standard Virtual Switch Properties
