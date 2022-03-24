@@ -1,5 +1,14 @@
 # :arrows_counterclockwise: AsBuiltReport.VMware.ESXi Changelog
 
+## [[1.1.2](https://github.com/AsBuiltReport/AsBuiltReport.VMware.ESXi/releases/tag/v1.1.2)] - 2022-03-24
+
+### Added
+- Automated tweet release workflow
+
+### Fixed
+- Fix hostname in virtual switch report section
+- Fix colour placeholders in `README.md`
+
 ## [[1.1.0](https://github.com/AsBuiltReport/AsBuiltReport.VMware.ESXi/releases/tag/v1.1.0)] - 2021-10-09
 
 ### Added
