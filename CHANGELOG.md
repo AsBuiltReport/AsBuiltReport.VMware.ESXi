@@ -1,4 +1,9 @@
-# :arrows_counterclockwise: AsBuiltReport.VMware.ESXi Changelog
+# :arrows_clockwise: AsBuiltReport.VMware.ESXi Changelog
+
+## [[1.1.3](https://github.com/AsBuiltReport/AsBuiltReport.VMware.ESXi/releases/tag/v1.1.2)] - 2022-04-21
+
+### Added
+- Added VMHost IPMI / BMC configuration information
 
 ## [[1.1.2](https://github.com/AsBuiltReport/AsBuiltReport.VMware.ESXi/releases/tag/v1.1.2)] - 2022-03-24
 
