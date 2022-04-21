@@ -5,7 +5,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
     .DESCRIPTION
         Documents the configuration of VMware ESXi servers in Word/HTML/XML/Text formats using PScribo.
     .NOTES
-        Version:        1.1.2
+        Version:        1.1.3
         Author:         Tim Carman
         Twitter:        @tpcarman
         Github:         tpcarman
@@ -167,6 +167,36 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                             }
                             $VMHostDetail | Table @TableParams
                             #endregion ESXi Host Specifications
+
+                            #region ESXi IPMI/BMC Settings
+                            Try {
+                                $VMHostIPMI = $esxcli.hardware.ipmi.bmc.get.invoke()
+                            } Catch {
+                                Write-PScriboMessage -IsWarning "Unable to collect IPMI / BMC configuration from $($VMHost.ExtensionData.Name)"
+                            }
+                            if ($VMHostIPMI) {
+                                Section -Style Heading3 'IPMI / BMC' {
+                                    $VMHostIPMIInfo = [PSCustomObject]@{
+                                        'Manufacturer' = $VMHostIPMI.Manufacturer
+                                        'MAC Address' = $VMHostIPMI.MacAddress
+                                        'IP Address' = $VMHostIPMI.IPv4Address
+                                        'Subnet Mask' = $VMHostIPMI.IPv4Subnet
+                                        'Gateway' = $VMHostIPMI.IPv4Gateway
+                                        'Firmware Version' = $VMHostIPMI.BMCFirmwareVersion
+                                    }
+
+                                    $TableParams = @{
+                                        Name = "IPMI / BMC - $($VMHost.ExtensionData.Name)"
+                                        List = $true
+                                        ColumnWidths = 50, 50
+                                    }
+                                    if ($Report.ShowTableCaptions) {
+                                        $TableParams['Caption'] = "- $($TableParams.Name)"
+                                    }
+                                    $VMHostIPMIInfo | Table @TableParams
+                                }
+                            }
+                            #endregion ESXi IPMI/BMC Settings
 
                             #region ESXi Host Boot Device
                             Section -Style Heading3 'Boot Device' {
