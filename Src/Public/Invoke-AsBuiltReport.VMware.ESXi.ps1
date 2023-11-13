@@ -226,52 +226,137 @@ function Invoke-AsBuiltReport.VMware.ESXi {
 
                             #region ESXi Host PCI Devices
                             Try {
-                                $PciHardwareDevices = $esxcli.hardware.pci.list.Invoke() | Where-Object { $_.VMkernelName -match 'vmhba|vmnic|vmgfx' -and $_.ModuleName -ne 'None'} | Sort-Object -Property VMkernelName
-                            } Catch {
-                                Write-PScriboMessage -IsWarning "Unable to collect PCI Devices configuration from $($VMHost.ExtensionData.Name)"
-                            }
-                            if ($PciHardwareDevices) {
-                                Section -Style Heading3 'PCI Devices' {
-                                    $VMHostPciDevices = foreach ($PciHardwareDevice in $PciHardwareDevices) {
-                                        [PSCustomObject]@{
-                                            'Device' = $PciHardwareDevice.VMkernelName
-                                            'PCI Address' = $PciHardwareDevice.Address
-                                            'Device Class' = $PciHardwareDevice.DeviceClassName
-                                            'Device Name' = $PciHardwareDevice.DeviceName
-                                            'Vendor Name' = $PciHardwareDevice.VendorName
-                                            'Slot Description' = $PciHardwareDevice.SlotDescription
+                                Section -Style Heading5 'PCI Devices' {
+                                    <# Move away from esxcli.v2 implementation to be compatible with 8.x branch.
+                                    'Slot Description' information does not seem to be available through the API
+                                    Create an array with PCI Address and VMware Devices (vmnic,vmhba,?vmgfx?)
+                                    #>
+                                    $PciToDeviceMapping = @{}
+                                    $NetworkAdapters  = Get-VMHostNetworkAdapter -VMHost $VMHost -Physical
+                                    foreach ($adapter in $NetworkAdapters) {
+                                        $PciToDeviceMapping[$adapter.PciId] = $adapter.DeviceName
+                                    }
+                                    $hbAdapters = Get-VMHostHba -VMHost $VMHost
+                                    foreach ($adapter in $hbAdapters) {
+                                        $PciToDeviceMapping[$adapter.Pci] = $adapter.Device
+                                    }
+                                    <# Data Object - HostGraphicsInfo(vim.host.GraphicsInfo)
+                                    This function has been available since version 5.5, but we can't be sure if it is still valid.
+                                    I don't have access to a vGPU-enabled system.
+                                    #>
+                                    $GpuAdapters = (Get-VMHost $VMhost | Get-View -Property Config).Config.GraphicsInfo
+                                    foreach ($adapter in $GpuAdapters) {
+                                        $PciToDeviceMapping[$adapter.pciId] = $adapter.deviceName
+                                    }
+
+                                    $VMHostPciDevice = @{
+                                        VMHost      = $VMHost
+                                        DeviceClass = @('MassStorageController', 'NetworkController', 'DisplayController', 'SerialBusController')
+                                    }
+                                    $PciDevices = Get-VMHostPciDevice @VMHostPciDevice
+
+                                    # Combine PciDevices and PciToDeviceMapping
+
+                                    $VMHostPciDevices = $PciDevices | ForEach-Object {
+                                        $PciDevice = $_
+                                        $device = $PCIToDeviceMapping[$pciDevice.Id]
+
+                                        if ($device) {
+                                            [PSCustomObject]@{
+                                                'Device'       = $device
+                                                'PCI Address'   = $PciDevice.Id
+                                                'Device Class'  = $PciDevice.DeviceClass -replace ('Controller',"")
+                                                'Device Name'   = $PciDevice.DeviceName
+                                                'Vendor Name'   = $PciDevice.VendorName
+                                            }
                                         }
                                     }
                                     $TableParams = @{
-                                        Name = "PCI Devices - $($VMHost.ExtensionData.Name)"
-                                        ColumnWidths = 12, 13, 15, 25, 20, 15
+                                        Name = "PCI Devices - $VMHost"
+                                        ColumnWidths = 17, 18, 15, 30, 20
                                     }
                                     if ($Report.ShowTableCaptions) {
                                         $TableParams['Caption'] = "- $($TableParams.Name)"
                                     }
-                                    $VMHostPciDevices | Table @TableParams
+                                    $VMHostPciDevices | Sort-Object 'Device' | Table @TableParams
                                 }
-                            }
+                            } Catch {Write-PScriboMessage -IsWarning "Unable to collect PCI Devices information from $VMHost"}
                             #endregion ESXi Host PCI Devices
 
                             #region ESXi Host PCI Devices Drivers & Firmware
                             Try {
-                                $VMHostPciDevicesDetails = Get-PciDeviceDetail -Server $ESXi -esxcli $esxcli | Sort-Object 'Device'
-                            } Catch {
-                                Write-PScriboMessage -IsWarning "Unable to collect PCI Devices Drivers & Firmware configuration from $($VMHost.ExtensionData.Name)"
-                            }
-                            if ($VMHostPciDevicesDetails) {
-                                Section -Style Heading3 'PCI Devices Drivers & Firmware' {
+                                Section -Style Heading5 'PCI Devices Drivers & Firmware' {
+                                    $PciToDeviceMapping = @{}
+                                    $NetworkAdapters  = Get-VMHostNetworkAdapter -VMHost $VMHost -Physical
+                                    foreach ($adapter in $NetworkAdapters) {
+                                        $PciToDeviceMapping[$adapter.PciId] = $adapter.DeviceName
+                                    }
+                                    $hbAdapters = Get-VMHostHba -VMHost $VMHost
+                                    foreach ($adapter in $hbAdapters) {
+                                        $PciToDeviceMapping[$adapter.Pci] = $adapter.Device
+                                    }
+                                    <# Data Object - HostGraphicsInfo(vim.host.GraphicsInfo)
+                                    This function has been available since version 5.5, but we can't be sure if it is still valid.
+                                    I don't have access to a vGPU-enabled system.
+                                    #>
+                                    $GpuAdapters = (Get-VMHost $VMhost | Get-View -Property Config).Config.GraphicsInfo
+                                    foreach ($adapter in $GpuAdapters) {
+                                        $PciToDeviceMapping[$adapter.pciId] = $adapter.deviceName
+                                    }
+
+                                    $VMHostPciDevice = @{
+                                        VMHost      = $VMHost
+                                        DeviceClass = @('MassStorageController', 'NetworkController', 'DisplayController', 'SerialBusController')
+                                    }
+                                    $PciDevices = Get-VMHostPciDevice @VMHostPciDevice
+
+                                    # Combine PciDevices and PciToDeviceMapping
+
+                                    $VMHostPciDevicesDetails = $PciDevices | ForEach-Object {
+                                        $PciDevice = $_
+                                        $device = $PCIToDeviceMapping[$pciDevice.Id]
+
+                                        if ($device) {
+                                            [PSCustomObject]@{
+                                                'Device' = $device
+                                                'Model' = $PciDevice.DeviceName
+                                                'Driver' = Switch ($PciDevice.DeviceClass) {
+                                                    'NetworkController' {($NetworkAdapters.ExtensionData | Where-Object {$_.Pci -eq $PciDevice.Id}).Driver}
+                                                    'MassStorageController' {($hbAdapters.ExtensionData | Where-Object {$_.Pci -eq $PciDevice.Id}).Driver}
+                                                    default {'--'}
+                                                }
+                                                'Driver Version' = Switch ($PciDevice.DeviceClass) {
+                                                    'NetworkController' {$esxcli.system.module.get.Invoke(@{module = ($NetworkAdapters.ExtensionData | Where-Object {$_.Pci -eq $PciDevice.Id}).Driver }).Version}
+                                                    'MassStorageController' {$esxcli.system.module.get.Invoke(@{module = ($hbAdapters.ExtensionData | Where-Object {$_.Pci -eq $PciDevice.Id}).Driver}).Version}
+                                                    default {'--'}
+                                                }
+                                                'Firmware Version' = Switch ($PciDevice.DeviceClass) {
+                                                    'NetworkController' {$esxcli.network.nic.get.Invoke(@{ nicname = $device }).DriverInfo.FirmwareVersion}
+                                                    default {'--'}
+                                                }
+                                                'VIB Name' = Switch ($PciDevice.DeviceClass) {
+                                                    'NetworkController' {($esxcli.software.vib.list.Invoke() | Select-Object -Property Name, Version | Where-Object { $_.Name -eq (($NetworkAdapters.ExtensionData | Where-Object {$_.Pci -eq $PciDevice.Id}).Driver) -or $_.Name -eq "net-" + (($NetworkAdapters.ExtensionData | Where-Object {$_.Pci -eq $PciDevice.Id}).Driver) -or $_.Name -eq "net55-" + (($NetworkAdapters.ExtensionData | Where-Object {$_.Pci -eq $PciDevice.Id}).Driver) }).Name}
+                                                    'MassStorageController' {($esxcli.software.vib.list.Invoke() | Select-Object -Property Name, Version | Where-Object { $_.Name -eq "scsi-" + (($hbAdapters.ExtensionData | Where-Object {$_.Pci -eq $PciDevice.Id}).Driver -replace "_", "-") -or $_.Name -eq "sata-" + (($hbAdapters.ExtensionData | Where-Object {$_.Pci -eq $PciDevice.Id}).Driver -replace "_", "-") -or $_.Name -eq (($hbAdapters.ExtensionData | Where-Object {$_.Pci -eq $PciDevice.Id}).Driver -replace "_", "-")}).Name}
+                                                    default {'--'}
+                                                }
+                                                'VIB Version' = Switch ($PciDevice.DeviceClass) {
+                                                    'NetworkController' {($esxcli.software.vib.list.Invoke() | Select-Object -Property Name, Version | Where-Object { $_.Name -eq (($NetworkAdapters.ExtensionData | Where-Object {$_.Pci -eq $PciDevice.Id}).Driver) -or $_.Name -eq "net-" + (($NetworkAdapters.ExtensionData | Where-Object {$_.Pci -eq $PciDevice.Id}).Driver) -or $_.Name -eq "net55-" + (($NetworkAdapters.ExtensionData | Where-Object {$_.Pci -eq $PciDevice.Id}).Driver) }).Version}
+                                                    'MassStorageController' {($esxcli.software.vib.list.Invoke() | Select-Object -Property Name, Version | Where-Object { $_.Name -eq "scsi-" + (($hbAdapters.ExtensionData | Where-Object {$_.Pci -eq $PciDevice.Id}).Driver -replace "_", "-") -or $_.Name -eq "sata-" + (($hbAdapters.ExtensionData | Where-Object {$_.Pci -eq $PciDevice.Id}).Driver -replace "_", "-") -or $_.Name -eq (($hbAdapters.ExtensionData | Where-Object {$_.Pci -eq $PciDevice.Id}).Driver -replace "_", "-")}).Version}
+                                                    default {'--'}
+                                                }
+                                            }
+                                        }
+                                    }
                                     $TableParams = @{
-                                        Name = "PCI Devices Drivers & Firmware - $($VMHost.ExtensionData.Name)"
+                                        Name = "PCI Devices Drivers & Firmware - $VMHost"
                                         ColumnWidths = 12, 20, 11, 19, 11, 11, 16
                                     }
                                     if ($Report.ShowTableCaptions) {
                                         $TableParams['Caption'] = "- $($TableParams.Name)"
                                     }
-                                    $VMHostPciDevicesDetails | Table @TableParams
+                                    $VMHostPciDevicesDetails | Sort-Object 'Device' | Table @TableParams
                                 }
-                            }
+                            } Catch {Write-PScriboMessage -IsWarning "Unable to collect PCI Devices Drivers & Firmware information from $VMHost"}
                             #endregion ESXi Host PCI Devices Drivers & Firmware
                         }
                         #endregion ESXi Host Hardware Section
