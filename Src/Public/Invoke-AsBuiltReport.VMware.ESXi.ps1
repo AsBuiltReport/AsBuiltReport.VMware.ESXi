@@ -226,7 +226,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
 
                             #region ESXi Host PCI Devices
                             Try {
-                                Section -Style Heading5 'PCI Devices' {
+                                Section -Style Heading3 'PCI Devices' {
                                     <# Move away from esxcli.v2 implementation to be compatible with 8.x branch.
                                     'Slot Description' information does not seem to be available through the API
                                     Create an array with PCI Address and VMware Devices (vmnic,vmhba,?vmgfx?)
@@ -285,7 +285,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
 
                             #region ESXi Host PCI Devices Drivers & Firmware
                             Try {
-                                Section -Style Heading5 'PCI Devices Drivers & Firmware' {
+                                Section -Style Heading3 'PCI Devices Drivers & Firmware' {
                                     $PciToDeviceMapping = @{}
                                     $NetworkAdapters  = Get-VMHostNetworkAdapter -VMHost $VMHost -Physical
                                     foreach ($adapter in $NetworkAdapters) {
