@@ -1,5 +1,9 @@
 # :arrows_clockwise: AsBuiltReport.VMware.ESXi Changelog
 
+## [[1.1.4](https://github.com/AsBuiltReport/AsBuiltReport.VMware.ESXi/releases/tag/v1.1.4)] - 2024-02-06
+- Fixed Issue 7 with Reporting on PCI Devices on hosts with no PCI devices. Added a if loops as needed.
+
+
 ## [[1.1.3](https://github.com/AsBuiltReport/AsBuiltReport.VMware.ESXi/releases/tag/v1.1.2)] - 2022-04-21
 
 ### Added
