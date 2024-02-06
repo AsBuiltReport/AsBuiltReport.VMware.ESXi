@@ -39,43 +39,47 @@ Function Get-PciDeviceDetail {
             Name = "N/A"
             Version = "N/A"
         }
-        $pciDevices = $esxcli.hardware.pci.list.Invoke() | Where-Object { $_.VMkernelName -match 'vmhba|vmnic|vmgfx' -and $_.ModuleName -ne 'None'} | Sort-Object -Property VMkernelName 
+        $pciDevices = $esxcli.hardware.pci.list.Invoke() | Where-Object { $_.VMkernelName -match 'vmhba|vmnic|vmgfx' -and $_.ModuleName -ne 'None'} | Sort-Object -Property VMkernelName
         $nicList = $esxcli.network.nic.list.Invoke() | Sort-Object Name
-        foreach ($pciDevice in $pciDevices) {
-            $driverVersion = $esxcli.system.module.get.Invoke(@{module = $pciDevice.ModuleName }) | Select-Object -ExpandProperty Version
-            # Get NIC Firmware version
-            if (($pciDevice.VMkernelName -like 'vmnic*') -and ($nicList.Name -contains $pciDevice.VMkernelName) ) {   
-                $vmnicDetail = $esxcli.network.nic.get.Invoke(@{nicname = $pciDevice.VMkernelName })
-                $firmwareVersion = $vmnicDetail.DriverInfo.FirmwareVersion
-                # Get NIC driver VIB package version
-                $driverVib = $esxcli.software.vib.list.Invoke() | Select-Object -Property Name, Version | Where-Object { $_.Name -eq $vmnicDetail.DriverInfo.Driver -or $_.Name -eq "net-" + $vmnicDetail.DriverInfo.Driver -or $_.Name -eq "net55-" + $vmnicDetail.DriverInfo.Driver }
-                <#
-                If HP Smart Array vmhba* (scsi-hpsa driver) then get Firmware version
-                else skip if VMkernnel is vmhba*. Can't get HBA Firmware from 
-                Powercli at the moment only through SSH or using Putty Plink+PowerCli.
-                #>
-            } elseif ($pciDevice.VMkernelName -like 'vmhba*') {
-                if ($pciDevice.DeviceName -match "smart array") {
-                    $hpsa = $vmhost.ExtensionData.Runtime.HealthSystemRuntime.SystemHealthInfo.NumericSensorInfo | Where-Object { $_.Name -match "HP Smart Array" }
-                    if ($hpsa) {
-                        $firmwareVersion = (($hpsa.Name -split "firmware")[1]).Trim()
+        if($pciDevices){
+            foreach ($pciDevice in $pciDevices) {
+                if($pciDevice){
+                    $driverVersion = $esxcli.system.module.get.Invoke(@{module = $pciDevice.ModuleName }) | Select-Object -ExpandProperty Version
+                    # Get NIC Firmware version
+                    if (($pciDevice.VMkernelName -like 'vmnic*') -and ($nicList.Name -contains $pciDevice.VMkernelName) ) {
+                        $vmnicDetail = $esxcli.network.nic.get.Invoke(@{nicname = $pciDevice.VMkernelName })
+                        $firmwareVersion = $vmnicDetail.DriverInfo.FirmwareVersion
+                        # Get NIC driver VIB package version
+                        $driverVib = $esxcli.software.vib.list.Invoke() | Select-Object -Property Name, Version | Where-Object { $_.Name -eq $vmnicDetail.DriverInfo.Driver -or $_.Name -eq "net-" + $vmnicDetail.DriverInfo.Driver -or $_.Name -eq "net55-" + $vmnicDetail.DriverInfo.Driver }
+                        <#
+                        If HP Smart Array vmhba* (scsi-hpsa driver) then get Firmware version
+                        else skip if VMkernnel is vmhba*. Can't get HBA Firmware from
+                        Powercli at the moment only through SSH or using Putty Plink+PowerCli.
+                        #>
+                    } elseif ($pciDevice.VMkernelName -like 'vmhba*') {
+                        if ($pciDevice.DeviceName -match "smart array") {
+                            $hpsa = $vmhost.ExtensionData.Runtime.HealthSystemRuntime.SystemHealthInfo.NumericSensorInfo | Where-Object { $_.Name -match "HP Smart Array" }
+                            if ($hpsa) {
+                                $firmwareVersion = (($hpsa.Name -split "firmware")[1]).Trim()
+                            }
+                        }
+                        # Get HBA driver VIB package version
+                        $vibName = $pciDevice.ModuleName -replace "_", "-"
+                        $driverVib = $esxcli.software.vib.list.Invoke() | Select-Object -Property Name, Version | Where-Object { $_.Name -eq "scsi-" + $VibName -or $_.Name -eq "sata-" + $VibName -or $_.Name -eq $VibName }
+                    }
+                    # Output collected data
+                    [PSCustomObject]@{
+                        'Device' = $pciDevice.VMkernelName
+                        'Model' = $pciDevice.DeviceName
+                        'Driver' = $pciDevice.ModuleName
+                        'Driver Version' = $driverVersion
+                        'Firmware Version' = $firmwareVersion
+                        'VIB Name' = $driverVib.Name
+                        'VIB Version' = $driverVib.Version
                     }
                 }
-                # Get HBA driver VIB package version
-                $vibName = $pciDevice.ModuleName -replace "_", "-"
-                $driverVib = $esxcli.software.vib.list.Invoke() | Select-Object -Property Name, Version | Where-Object { $_.Name -eq "scsi-" + $VibName -or $_.Name -eq "sata-" + $VibName -or $_.Name -eq $VibName }
             }
-            # Output collected data
-            [PSCustomObject]@{
-                'Device' = $pciDevice.VMkernelName
-                'Model' = $pciDevice.DeviceName
-                'Driver' = $pciDevice.ModuleName
-                'Driver Version' = $driverVersion
-                'Firmware Version' = $firmwareVersion
-                'VIB Name' = $driverVib.Name
-                'VIB Version' = $driverVib.Version
-            }
-        } 
+        }
     }
     End { }
 }

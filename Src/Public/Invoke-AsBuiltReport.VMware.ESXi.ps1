@@ -5,7 +5,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
     .DESCRIPTION
         Documents the configuration of VMware ESXi servers in Word/HTML/XML/Text formats using PScribo.
     .NOTES
-        Version:        1.1.3
+        Version:        1.1.4
         Author:         Tim Carman
         Twitter:        @tpcarman
         Github:         tpcarman
@@ -227,38 +227,44 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                             #region ESXi Host PCI Devices
                             Section -Style Heading3 'PCI Devices' {
                                 $PciHardwareDevices = $esxcli.hardware.pci.list.Invoke() | Where-Object { $_.VMkernelName -match 'vmhba|vmnic|vmgfx' -and $_.ModuleName -ne 'None'} | Sort-Object -Property VMkernelName
-                                $VMHostPciDevices = foreach ($PciHardwareDevice in $PciHardwareDevices) {
-                                    [PSCustomObject]@{
-                                        'Device' = $PciHardwareDevice.VMkernelName
-                                        'PCI Address' = $PciHardwareDevice.Address
-                                        'Device Class' = $PciHardwareDevice.DeviceClassName
-                                        'Device Name' = $PciHardwareDevice.DeviceName
-                                        'Vendor Name' = $PciHardwareDevice.VendorName
-                                        'Slot Description' = $PciHardwareDevice.SlotDescription
+                                If($PciHardwareDevices){
+                                    $VMHostPciDevices = foreach ($PciHardwareDevice in $PciHardwareDevices) {
+                                        if($PciHardwareDevice){
+                                            [PSCustomObject]@{
+                                                'Device' = $PciHardwareDevice.VMkernelName
+                                                'PCI Address' = $PciHardwareDevice.Address
+                                                'Device Class' = $PciHardwareDevice.DeviceClassName
+                                                'Device Name' = $PciHardwareDevice.DeviceName
+                                                'Vendor Name' = $PciHardwareDevice.VendorName
+                                                'Slot Description' = $PciHardwareDevice.SlotDescription
+                                            }
+                                        }
                                     }
+                                    $TableParams = @{
+                                        Name = "PCI Devices - $($VMHost.ExtensionData.Name)"
+                                        ColumnWidths = 12, 13, 15, 25, 20, 15
+                                    }
+                                    if ($Report.ShowTableCaptions) {
+                                        $TableParams['Caption'] = "- $($TableParams.Name)"
+                                    }
+                                    $VMHostPciDevices | Table @TableParams
                                 }
-                                $TableParams = @{
-                                    Name = "PCI Devices - $($VMHost.ExtensionData.Name)"
-                                    ColumnWidths = 12, 13, 15, 25, 20, 15
-                                }
-                                if ($Report.ShowTableCaptions) {
-                                    $TableParams['Caption'] = "- $($TableParams.Name)"
-                                }
-                                $VMHostPciDevices | Table @TableParams
                             }
                             #endregion ESXi Host PCI Devices
 
                             #region ESXi Host PCI Devices Drivers & Firmware
                             Section -Style Heading3 'PCI Devices Drivers & Firmware' {
                                 $VMHostPciDevicesDetails = Get-PciDeviceDetail -Server $ESXi -esxcli $esxcli | Sort-Object 'Device'
-                                $TableParams = @{
-                                    Name = "PCI Devices Drivers & Firmware - $($VMHost.ExtensionData.Name)"
-                                    ColumnWidths = 12, 20, 11, 19, 11, 11, 16
+                                If($VMHostPciDevicesDetails){
+                                    $TableParams = @{
+                                        Name = "PCI Devices Drivers & Firmware - $($VMHost.ExtensionData.Name)"
+                                        ColumnWidths = 12, 20, 11, 19, 11, 11, 16
+                                    }
+                                    if ($Report.ShowTableCaptions) {
+                                        $TableParams['Caption'] = "- $($TableParams.Name)"
+                                    }
+                                    $VMHostPciDevicesDetails | Table @TableParams
                                 }
-                                if ($Report.ShowTableCaptions) {
-                                    $TableParams['Caption'] = "- $($TableParams.Name)"
-                                }
-                                $VMHostPciDevicesDetails | Table @TableParams
                             }
                             #endregion ESXi Host PCI Devices Drivers & Firmware
                             #>
