@@ -13,8 +13,9 @@
 
 ### Fixed
 - ESXi storage information not shown when VMHost InfoLevel set to 0
-- Update VMHost PCI Devices reporting to fix issues with ESXi 8.x hosts (@orb71)
+- Update VMHost PCI Devices reporting to fix issues with ESXi 8.x hosts (@orb71) ([Fix #7](https://github.com/AsBuiltReport/AsBuiltReport.VMware.ESXi/issues/7))
 - Fix issue with license reporting
+- Fix issue when no BMC information found ([Fix #12](https://github.com/AsBuiltReport/AsBuiltReport.VMware.ESXi/issues/12))
 
 ### Removed
 - Remove VMware document style script
