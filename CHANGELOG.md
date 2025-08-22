@@ -14,6 +14,7 @@
 ### Fixed
 - ESXi storage information not shown when VMHost InfoLevel set to 0
 - Update VMHost PCI Devices reporting to fix issues with ESXi 8.x hosts (@orb71)
+- Fix issue with license reporting
 
 ### Removed
 - Remove VMware document style script
