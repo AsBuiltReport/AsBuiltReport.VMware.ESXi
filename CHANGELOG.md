@@ -1,6 +1,25 @@
 # :arrows_clockwise: AsBuiltReport.VMware.ESXi Changelog
 
-## [[1.1.3](https://github.com/AsBuiltReport/AsBuiltReport.VMware.ESXi/releases/tag/v1.1.2)] - 2022-04-21
+## [[1.1.4](https://github.com/AsBuiltReport/AsBuiltReport.VMware.ESXi/releases/tag/v1.1.4)] - 2025-08-22
+
+### Changed
+- Update module manifest `RequiredModules` updated for AsBuiltReport.Core 1.4.3
+- Update PowerCLI module requirements to VCF PowerCLI 9.0
+- Update colour placeholders in `README.md`
+- Update `Get-RequiredModule` script function
+- Update bug and feature request templates
+- Change table column widths for list tables to 40/60
+- Add try/catch code blocks for improved error handling
+
+### Fixed
+- ESXi storage information not shown when VMHost InfoLevel set to 0
+- Update VMHost PCI Devices reporting to fix issues with ESXi 8.x hosts (@orb71)
+- Fix issue with license reporting
+
+### Removed
+- Remove VMware document style script
+
+## [[1.1.3](https://github.com/AsBuiltReport/AsBuiltReport.VMware.ESXi/releases/tag/v1.1.3)] - 2022-04-21
 
 ### Added
 - Added VMHost IPMI / BMC configuration information

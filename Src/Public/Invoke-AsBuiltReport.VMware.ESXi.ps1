@@ -5,7 +5,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
     .DESCRIPTION
         Documents the configuration of VMware ESXi servers in Word/HTML/XML/Text formats using PScribo.
     .NOTES
-        Version:        1.1.3
+        Version:        1.1.4
         Author:         Tim Carman
         Twitter:        @tpcarman
         Github:         tpcarman
@@ -19,8 +19,25 @@ function Invoke-AsBuiltReport.VMware.ESXi {
         [PSCredential] $Credential
     )
 
-    # Check if the required version of VMware PowerCLI is installed
-    Get-RequiredModule -Name 'VMware.PowerCLI' -Version '12.3'
+    Write-PScriboMessage -Plugin "Module" -Message "Please refer to the AsBuiltReport.VMware.ESXi GitHub website for more detailed information about this project."
+    Write-PScriboMessage -Plugin "Module" -Message "Do not forget to update your report configuration file after each new version release: https://www.asbuiltreport.com/user-guide/new-asbuiltreportconfig/"
+    Write-PScriboMessage -Plugin "Module" -Message "Documentation: https://github.com/AsBuiltReport/AsBuiltReport.VMware.ESXi"
+    Write-PScriboMessage -Plugin "Module" -Message "Issues or bug reporting: https://github.com/AsBuiltReport/AsBuiltReport.VMware.ESXi/issues"
+
+    # Check if the required version of VCF PowerCLI is installed
+    Get-RequiredModule -Name 'VCF.PowerCLI' -Version '9.0'
+
+    # Check the current AsBuiltReport.VMware.ESXi module
+    $InstalledVersion = Get-Module -ListAvailable -Name AsBuiltReport.VMware.ESXi -ErrorAction SilentlyContinue | Sort-Object -Property Version -Descending | Select-Object -First 1 -ExpandProperty Version
+
+    if ($InstalledVersion) {
+        Write-PScriboMessage -Plugin "Module" -Message "AsBuiltReport.VMware.ESXi $($InstalledVersion.ToString()) is currently installed."
+        $LatestVersion = Find-Module -Name AsBuiltReport.VMware.ESXi -Repository PSGallery -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Version
+        if ($LatestVersion -gt $InstalledVersion) {
+            Write-PScriboMessage -Plugin "Module" -Message "AsBuiltReport.VMware.ESXi $($LatestVersion.ToString()) is available."
+            Write-PScriboMessage -Plugin "Module" -Message "Run 'Update-Module -Name AsBuiltReport.VMware.ESXi -Force' to install the latest version."
+        }
+    }
 
     # Import Report Configuration
     $Report = $ReportConfig.Report
@@ -91,177 +108,230 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                             BlankLine
 
                             #region ESXi Host Specifications
-                            $VMHostUptime = Get-Uptime -VMHost $VMHost
-                            $esxcli = Get-EsxCli -VMHost $VMHost -V2
-                            $VMHostLicense = Get-VMHostLicense -VMHost $VMHost
-                            $ScratchLocation = Get-AdvancedSetting -Entity $VMHost | Where-Object { $_.Name -eq 'ScratchConfig.CurrentScratchLocation' }
-                            $VMHostDetail = [PSCustomObject]@{
-                                'Host' = $VMHost.ExtensionData.Name
-                                'Connection State' = Switch ($VMHost.ConnectionState) {
-                                    'NotResponding' { 'Not Responding' }
-                                    default { $VMHost.ConnectionState }
+                            Try {
+                                $VMHostUptime = Get-Uptime -VMHost $VMHost
+                                $global:esxcli = Get-EsxCli -VMHost $VMHost -V2
+                                $VMHostLicense = Get-VMHostLicense -VMHost $VMHost
+                                $ScratchLocation = Get-AdvancedSetting -Entity $VMHost | Where-Object { $_.Name -eq 'ScratchConfig.CurrentScratchLocation' }
+                                $VMHostDetail = [PSCustomObject]@{
+                                    'Host' = $VMHost.ExtensionData.Name
+                                    'Connection State' = Switch ($VMHost.ConnectionState) {
+                                        'NotResponding' { 'Not Responding' }
+                                        default { $VMHost.ConnectionState }
+                                    }
+                                    'ID' = $VMHost.Id
+                                    'Manufacturer' = $VMHost.Manufacturer
+                                    'Model' = $VMHost.Model
+                                    'Serial Number' = Switch ($VMHost.ExtensionData.Hardware.SystemInfo.SerialNumber) {
+                                        $null { '--' }
+                                        default { $VMHost.ExtensionData.Hardware.SystemInfo.SerialNumber }
+                                    }
+                                    'Asset Tag' = Switch ($VMHost.ExtensionData.Summary.Hardware.OtherIdentifyingInfo[0].IdentifierValue) {
+                                        '' { 'Unknown' }
+                                        $null  { 'Unknown' }
+                                        default { $VMHost.ExtensionData.Summary.Hardware.OtherIdentifyingInfo[0].IdentifierValue }
+                                    }
+                                    'Processor Type' = $VMHost.Processortype
+                                    'HyperThreading' = Switch ($VMHost.HyperthreadingActive) {
+                                        $true { 'Enabled' }
+                                        $false { 'Disabled' }
+                                    }
+                                    'Number of CPU Sockets' = $VMHost.ExtensionData.Hardware.CpuInfo.NumCpuPackages
+                                    'Number of CPU Cores' = $VMHost.ExtensionData.Hardware.CpuInfo.NumCpuCores
+                                    'Number of CPU Threads' = $VMHost.ExtensionData.Hardware.CpuInfo.NumCpuThreads
+                                    'CPU Total / Used' = "$([math]::Round(($VMHost.CpuTotalMhz) / 1000, 2)) GHz / $([math]::Round(($VMHost.CpuUsageMhz) / 1000, 2)) GHz"
+                                    'Memory Total / Used' = "$([math]::Round($VMHost.MemoryTotalGB, 2)) GB / $([math]::Round($VMHost.MemoryUsageGB, 2)) GB"
+                                    'NUMA Nodes' = $VMHost.ExtensionData.Hardware.NumaInfo.NumNodes
+                                    'Number of NICs' = $VMHost.ExtensionData.Summary.Hardware.NumNics
+                                    'Number of Datastores' = $VMHost.ExtensionData.Datastore.Count
+                                    'Number of VMs' = $VMHost.ExtensionData.VM.Count
+                                    'Power Management Policy' = $VMHost.ExtensionData.Hardware.CpuPowerManagementInfo.CurrentPolicy
+                                    'Scratch Location' = $ScratchLocation.Value
+                                    'Bios Version' = $VMHost.ExtensionData.Hardware.BiosInfo.BiosVersion
+                                    'Bios Release Date' = $VMHost.ExtensionData.Hardware.BiosInfo.ReleaseDate
+                                    'ESXi Version' = $VMHost.Version
+                                    'ESXi Build' = $VMHost.build
+                                    'Product' = $VMHostLicense.Product -join ', '
+                                    'License Key' = $VMHostLicense.LicenseKey
+                                    'License Expiration' = $VMHostLicense.Expiration
+                                    'Boot Time' = ($VMHost.ExtensionData.Runtime.Boottime).ToLocalTime()
+                                    'Uptime Days' = $VMHostUptime.UptimeDays
                                 }
-                                'ID' = $VMHost.Id
-                                'Manufacturer' = $VMHost.Manufacturer
-                                'Model' = $VMHost.Model
-                                'Serial Number' = Switch ($VMHost.ExtensionData.Hardware.SystemInfo.SerialNumber) {
-                                    $null { '--' }
-                                    default { $VMHost.ExtensionData.Hardware.SystemInfo.SerialNumber }
+                                if ($Healthcheck.VMHost.ConnectionState) {
+                                    $VMHostDetail | Where-Object { $_.'Connection State' -eq 'Maintenance' } | Set-Style -Style Warning -Property 'Connection State'
                                 }
-                                'Asset Tag' = Switch ($VMHost.ExtensionData.Summary.Hardware.OtherIdentifyingInfo[0].IdentifierValue) {
-                                    '' { 'Unknown' }
-                                    $null  { 'Unknown' }
-                                    default { $VMHost.ExtensionData.Summary.Hardware.OtherIdentifyingInfo[0].IdentifierValue }
+                                if ($Healthcheck.VMHost.HyperThreading) {
+                                    $VMHostDetail | Where-Object { $_.'HyperThreading' -eq 'Disabled' } | Set-Style -Style Warning -Property 'Disabled'
                                 }
-                                'Processor Type' = $VMHost.Processortype
-                                'HyperThreading' = Switch ($VMHost.HyperthreadingActive) {
-                                    $true { 'Enabled' }
-                                    $false { 'Disabled' }
+                                if ($Healthcheck.VMHost.Licensing) {
+                                    $VMHostDetail | Where-Object { $_.'Product' -like '*Evaluation*' } | Set-Style -Style Warning -Property 'Product'
+                                    $VMHostDetail | Where-Object { $_.'License Key' -like '*-00000-00000' } | Set-Style -Style Warning -Property 'License Key'
+                                    $VMHostDetail | Where-Object { $_.'License Expiration' -eq 'Expired' } | Set-Style -Style Critical -Property 'License Expiration'
                                 }
-                                'Number of CPU Sockets' = $VMHost.ExtensionData.Hardware.CpuInfo.NumCpuPackages
-                                'Number of CPU Cores' = $VMHost.ExtensionData.Hardware.CpuInfo.NumCpuCores
-                                'Number of CPU Threads' = $VMHost.ExtensionData.Hardware.CpuInfo.NumCpuThreads
-                                'CPU Total / Used' = "$([math]::Round(($VMHost.CpuTotalMhz) / 1000, 2)) GHz / $([math]::Round(($VMHost.CpuUsageMhz) / 1000, 2)) GHz"
-                                'Memory Total / Used' = "$([math]::Round($VMHost.MemoryTotalGB, 2)) GB / $([math]::Round($VMHost.MemoryUsageGB, 2)) GB"
-                                'NUMA Nodes' = $VMHost.ExtensionData.Hardware.NumaInfo.NumNodes
-                                'Number of NICs' = $VMHost.ExtensionData.Summary.Hardware.NumNics
-                                'Number of Datastores' = $VMHost.ExtensionData.Datastore.Count
-                                'Number of VMs' = $VMHost.ExtensionData.VM.Count
-                                'Power Management Policy' = $VMHost.ExtensionData.Hardware.CpuPowerManagementInfo.CurrentPolicy
-                                'Scratch Location' = $ScratchLocation.Value
-                                'Bios Version' = $VMHost.ExtensionData.Hardware.BiosInfo.BiosVersion
-                                'Bios Release Date' = $VMHost.ExtensionData.Hardware.BiosInfo.ReleaseDate
-                                'ESXi Version' = $VMHost.Version
-                                'ESXi Build' = $VMHost.build
-                                'Product' = $VMHostLicense.Product -join ', '
-                                'License Key' = $VMHostLicense.LicenseKey
-                                'License Expiration' = $VMHostLicense.Expiration
-                                'Boot Time' = ($VMHost.ExtensionData.Runtime.Boottime).ToLocalTime()
-                                'Uptime Days' = $VMHostUptime.UptimeDays
+                                if ($Healthcheck.VMHost.ScratchLocation) {
+                                    $VMHostDetail | Where-Object { $_.'Scratch Location' -eq '/tmp/scratch' } | Set-Style -Style Warning -Property 'Scratch Location'
+                                }
+                                if ($Healthcheck.VMHost.UpTimeDays) {
+                                    $VMHostDetail | Where-Object { $_.'Uptime Days' -ge 275 -and $_.'Uptime Days' -lt 365 } | Set-Style -Style Warning -Property 'Uptime Days'
+                                    $VMHostDetail | Where-Object { $_.'Uptime Days' -ge 365 } | Set-Style -Style Critical -Property 'Uptime Days'
+                                }
+                                $TableParams = @{
+                                    Name = "ESXi Host Configuration - $($VMHost.ExtensionData.Name)"
+                                    List = $true
+                                    ColumnWidths = 40, 60
+                                }
+                                if ($Report.ShowTableCaptions) {
+                                    $TableParams['Caption'] = "- $($TableParams.Name)"
+                                }
+                                $VMHostDetail | Table @TableParams
+                            } Catch {
+                                Write-PScriboMessage -IsWarning "$($_.Exception.Message)"
                             }
-                            if ($Healthcheck.VMHost.ConnectionState) {
-                                $VMHostDetail | Where-Object { $_.'Connection State' -eq 'Maintenance' } | Set-Style -Style Warning -Property 'Connection State'
-                            }
-                            if ($Healthcheck.VMHost.HyperThreading) {
-                                $VMHostDetail | Where-Object { $_.'HyperThreading' -eq 'Disabled' } | Set-Style -Style Warning -Property 'Disabled'
-                            }
-                            if ($Healthcheck.VMHost.Licensing) {
-                                $VMHostDetail | Where-Object { $_.'Product' -like '*Evaluation*' } | Set-Style -Style Warning -Property 'Product'
-                                $VMHostDetail | Where-Object { $_.'License Key' -like '*-00000-00000' } | Set-Style -Style Warning -Property 'License Key'
-                                $VMHostDetail | Where-Object { $_.'License Expiration' -eq 'Expired' } | Set-Style -Style Critical -Property 'License Expiration'
-                            }
-                            if ($Healthcheck.VMHost.ScratchLocation) {
-                                $VMHostDetail | Where-Object { $_.'Scratch Location' -eq '/tmp/scratch' } | Set-Style -Style Warning -Property 'Scratch Location'
-                            }
-                            if ($Healthcheck.VMHost.UpTimeDays) {
-                                $VMHostDetail | Where-Object { $_.'Uptime Days' -ge 275 -and $_.'Uptime Days' -lt 365 } | Set-Style -Style Warning -Property 'Uptime Days'
-                                $VMHostDetail | Where-Object { $_.'Uptime Days' -ge 365 } | Set-Style -Style Critical -Property 'Uptime Days'
-                            }
-                            $TableParams = @{
-                                Name = "ESXi Host Configuration - $($VMHost.ExtensionData.Name)"
-                                List = $true
-                                ColumnWidths = 50, 50
-                            }
-                            if ($Report.ShowTableCaptions) {
-                                $TableParams['Caption'] = "- $($TableParams.Name)"
-                            }
-                            $VMHostDetail | Table @TableParams
                             #endregion ESXi Host Specifications
 
                             #region ESXi IPMI/BMC Settings
                             Try {
                                 $VMHostIPMI = $esxcli.hardware.ipmi.bmc.get.invoke()
                             } Catch {
-                                Write-PScriboMessage -IsWarning "Unable to collect IPMI / BMC configuration from $($VMHost.ExtensionData.Name)"
+                                Write-PScriboMessage -IsWarning "Failed to retrieve IPMI/BMC settings: $($_.Exception.Message)"
                             }
                             if ($VMHostIPMI) {
-                                Section -Style Heading3 'IPMI / BMC' {
-                                    $VMHostIPMIInfo = [PSCustomObject]@{
-                                        'Manufacturer' = $VMHostIPMI.Manufacturer
-                                        'MAC Address' = $VMHostIPMI.MacAddress
-                                        'IP Address' = $VMHostIPMI.IPv4Address
-                                        'Subnet Mask' = $VMHostIPMI.IPv4Subnet
-                                        'Gateway' = $VMHostIPMI.IPv4Gateway
-                                        'Firmware Version' = $VMHostIPMI.BMCFirmwareVersion
-                                    }
+                                Try {
 
-                                    $TableParams = @{
-                                        Name = "IPMI / BMC - $($VMHost.ExtensionData.Name)"
-                                        List = $true
-                                        ColumnWidths = 50, 50
+                                    Section -Style Heading3 'IPMI / BMC' {
+                                        $VMHostIPMIInfo = [PSCustomObject]@{
+                                            'Manufacturer' = $VMHostIPMI.Manufacturer
+                                            'MAC Address' = $VMHostIPMI.MacAddress
+                                            'IP Address' = $VMHostIPMI.IPv4Address
+                                            'Subnet Mask' = $VMHostIPMI.IPv4Subnet
+                                            'Gateway' = $VMHostIPMI.IPv4Gateway
+                                            'Firmware Version' = $VMHostIPMI.BMCFirmwareVersion
+                                        }
+
+                                        $TableParams = @{
+                                            Name = "IPMI / BMC - $($VMHost.ExtensionData.Name)"
+                                            List = $true
+                                            ColumnWidths = 40, 60
+                                        }
+                                        if ($Report.ShowTableCaptions) {
+                                            $TableParams['Caption'] = "- $($TableParams.Name)"
+                                        }
+                                        $VMHostIPMIInfo | Table @TableParams
                                     }
-                                    if ($Report.ShowTableCaptions) {
-                                        $TableParams['Caption'] = "- $($TableParams.Name)"
-                                    }
-                                    $VMHostIPMIInfo | Table @TableParams
+                                } Catch {
+                                    Write-PScriboMessage -IsWarning "$($_.Exception.Message)"
                                 }
                             }
                             #endregion ESXi IPMI/BMC Settings
 
                             #region ESXi Host Boot Device
-                            Section -Style Heading3 'Boot Device' {
-                                $ESXiBootDevice = Get-ESXiBootDevice -VMHost $VMHost
-                                $VMHostBootDevice = [PSCustomObject]@{
-                                    'Host' = $ESXiBootDevice.Host
-                                    'Device' = $ESXiBootDevice.Device
-                                    'Boot Type' = $ESXiBootDevice.BootType
-                                    'Vendor' = $ESXiBootDevice.Vendor
-                                    'Model' = $ESXiBootDevice.Model
-                                    'Size' = "$([math]::Round($ESXiBootDevice.SizeMB / 1024, 2)) GB"
-                                    'Is SAS' = $ESXiBootDevice.IsSAS
-                                    'Is SSD' = $ESXiBootDevice.IsSSD
-                                    'Is USB' = $ESXiBootDevice.IsUSB
+                            $ESXiBootDevice = Get-ESXiBootDevice
+                            if ($ESXiBootDevice) {
+                                Try {
+                                    Section -Style Heading3 'Boot Device' {
+                                        $VMHostBootDevice = [PSCustomObject]@{
+                                            'Host' = $ESXiBootDevice.Host
+                                            'Device' = $ESXiBootDevice.Device
+                                            'Boot Type' = $ESXiBootDevice.BootType
+                                            'Vendor' = $ESXiBootDevice.Vendor
+                                            'Model' = $ESXiBootDevice.Model
+                                            'Size' = "$([math]::Round($ESXiBootDevice.SizeMB / 1024, 2)) GB"
+                                            'Is SAS' = $ESXiBootDevice.IsSAS
+                                            'Is SSD' = $ESXiBootDevice.IsSSD
+                                            'Is USB' = $ESXiBootDevice.IsUSB
+                                        }
+                                        $TableParams = @{
+                                            Name = "Boot Device - $($VMHost.ExtensionData.Name)"
+                                            List = $true
+                                            ColumnWidths = 40, 60
+                                        }
+                                        if ($Report.ShowTableCaptions) {
+                                            $TableParams['Caption'] = "- $($TableParams.Name)"
+                                        }
+                                        $VMHostBootDevice | Table @TableParams
+                                    }
+                                } Catch {
+                                    Write-PScriboMessage -IsWarning "$($_.Exception.Message)"
                                 }
-                                $TableParams = @{
-                                    Name = "Boot Device - $($VMHost.ExtensionData.Name)"
-                                    List = $true
-                                    ColumnWidths = 50, 50
-                                }
-                                if ($Report.ShowTableCaptions) {
-                                    $TableParams['Caption'] = "- $($TableParams.Name)"
-                                }
-                                $VMHostBootDevice | Table @TableParams
                             }
                             #endregion ESXi Host Boot Devices
 
                             #region ESXi Host PCI Devices
                             Section -Style Heading3 'PCI Devices' {
-                                $PciHardwareDevices = $esxcli.hardware.pci.list.Invoke() | Where-Object { $_.VMkernelName -match 'vmhba|vmnic|vmgfx' -and $_.ModuleName -ne 'None'} | Sort-Object -Property VMkernelName
-                                $VMHostPciDevices = foreach ($PciHardwareDevice in $PciHardwareDevices) {
-                                    [PSCustomObject]@{
-                                        'Device' = $PciHardwareDevice.VMkernelName
-                                        'PCI Address' = $PciHardwareDevice.Address
-                                        'Device Class' = $PciHardwareDevice.DeviceClassName
-                                        'Device Name' = $PciHardwareDevice.DeviceName
-                                        'Vendor Name' = $PciHardwareDevice.VendorName
-                                        'Slot Description' = $PciHardwareDevice.SlotDescription
+                                <# Move away from esxcli.v2 implementation to be compatible with 8.x branch.
+                                'Slot Description' information does not seem to be available through the API
+                                Create an array with PCI Address and VMware Devices (vmnic,vmhba,?vmgfx?)
+                                #>
+                                $PciToDeviceMapping = @{}
+                                $NetworkAdapters = Get-VMHostNetworkAdapter -VMHost $VMHost -Physical
+                                foreach ($adapter in $NetworkAdapters) {
+                                    $PciToDeviceMapping[$adapter.PciId] = $adapter.DeviceName
+                                }
+                                $hbAdapters = Get-VMHostHba -VMHost $VMHost
+                                foreach ($adapter in $hbAdapters) {
+                                    $PciToDeviceMapping[$adapter.Pci] = $adapter.Device
+                                }
+                                <# Data Object - HostGraphicsInfo(vim.host.GraphicsInfo)
+                                This function has been available since version 5.5, but we can't be sure if it is still valid.
+                                I don't have access to a vGPU-enabled system.
+                                #>
+                                $GpuAdapters = (Get-VMHost $VMhost | Get-View -Property Config).Config.GraphicsInfo
+                                foreach ($adapter in $GpuAdapters) {
+                                    $PciToDeviceMapping[$adapter.pciId] = $adapter.deviceName
+                                }
+
+                                $VMHostPciDevice = @{
+                                    VMHost = $VMHost
+                                    DeviceClass = @('MassStorageController', 'NetworkController', 'DisplayController', 'SerialBusController')
+                                }
+                                $PciDevices = Get-VMHostPciDevice @VMHostPciDevice
+
+                                # Combine PciDevices and PciToDeviceMapping
+                                $VMHostPciDevices = $PciDevices | ForEach-Object {
+                                    $PciDevice = $_
+                                    $device = $PCIToDeviceMapping[$pciDevice.Id]
+
+                                    if ($device) {
+                                        [PSCustomObject]@{
+                                            'Device' = $device
+                                            'PCI Address' = $PciDevice.Id
+                                            'Device Class' = $PciDevice.DeviceClass -replace ('Controller', "")
+                                            'Device Name' = $PciDevice.DeviceName
+                                            'Vendor Name' = $PciDevice.VendorName
+                                        }
                                     }
                                 }
+
                                 $TableParams = @{
                                     Name = "PCI Devices - $($VMHost.ExtensionData.Name)"
-                                    ColumnWidths = 12, 13, 15, 25, 20, 15
+                                    ColumnWidths = 17, 18, 15, 30, 20
                                 }
                                 if ($Report.ShowTableCaptions) {
                                     $TableParams['Caption'] = "- $($TableParams.Name)"
                                 }
-                                $VMHostPciDevices | Table @TableParams
+                                $VMHostPciDevices | Sort-Object 'Device' | Table @TableParams
                             }
                             #endregion ESXi Host PCI Devices
 
                             #region ESXi Host PCI Devices Drivers & Firmware
-                            Section -Style Heading3 'PCI Devices Drivers & Firmware' {
-                                $VMHostPciDevicesDetails = Get-PciDeviceDetail -Server $ESXi -esxcli $esxcli | Sort-Object 'Device'
-                                $TableParams = @{
-                                    Name = "PCI Devices Drivers & Firmware - $($VMHost.ExtensionData.Name)"
-                                    ColumnWidths = 12, 20, 11, 19, 11, 11, 16
+                            $VMHostPciDevicesDetails = Get-PciDeviceDetail | Sort-Object 'Device'
+                            if ($VMHostPciDevicesDetails) {
+                                Try {
+                                    Section -Style Heading3 'PCI Devices Drivers & Firmware' {
+                                        $TableParams = @{
+                                            Name = "PCI Devices Drivers & Firmware - $($VMHost.ExtensionData.Name)"
+                                            ColumnWidths = 12, 20, 11, 19, 11, 11, 16
+                                        }
+                                        if ($Report.ShowTableCaptions) {
+                                            $TableParams['Caption'] = "- $($TableParams.Name)"
+                                        }
+                                        $VMHostPciDevicesDetails | Table @TableParams
+                                    }
+                                } Catch {
+                                    Write-PScriboMessage -IsWarning "$($_.Exception.Message)"
                                 }
-                                if ($Report.ShowTableCaptions) {
-                                    $TableParams['Caption'] = "- $($TableParams.Name)"
-                                }
-                                $VMHostPciDevicesDetails | Table @TableParams
                             }
                             #endregion ESXi Host PCI Devices Drivers & Firmware
-                            #>
                         }
                         #endregion ESXi Host Hardware Section
 
@@ -269,64 +339,81 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                         Section -Style Heading2 'System' {
                             Paragraph "The following section details the host system configuration for $($VMHost.ExtensionData.Name)."
                             #region ESXi Host Image Profile Information
-                            Section -Style Heading3 'Image Profile' {
-                                $installdate = Get-InstallDate
-                                $esxcli = Get-EsxCli -VMHost $VMHost -V2
+                            Try {
                                 $ImageProfile = $esxcli.software.profile.get.Invoke()
-                                $SecurityProfile = [PSCustomObject]@{
-                                    'Image Profile' = $ImageProfile.Name
-                                    'Vendor' = $ImageProfile.Vendor
-                                    'Installation Date' = $InstallDate.InstallDate
+                            } Catch {
+                                Write-PScriboMessage -IsWarning "Failed to retrieve image profile: $($_.Exception.Message)"
+                            }
+                            if ($ImageProfile) {
+                                Try {
+                                    Section -Style Heading3 'Image Profile' {
+                                        $installdate = Get-InstallDate -VMHost $VMHost
+                                        $SecurityProfile = [PSCustomObject]@{
+                                            'Image Profile' = $ImageProfile.Name
+                                            'Vendor' = $ImageProfile.Vendor
+                                            'Installation Date' = $InstallDate.InstallDate
+                                        }
+                                        $TableParams = @{
+                                            Name = "Image Profile - $($VMHost.ExtensionData.Name)"
+                                            ColumnWidths = 45, 25, 30
+                                        }
+                                        if ($Report.ShowTableCaptions) {
+                                            $TableParams['Caption'] = "- $($TableParams.Name)"
+                                        }
+                                        $SecurityProfile | Table @TableParams
+                                    }
+                                } Catch {
+                                    Write-PScriboMessage -IsWarning "$($_.Exception.Message)"
                                 }
-                                $TableParams = @{
-                                    Name = "Image Profile - $($VMHost.ExtensionData.Name)"
-                                    #ColumnWidths = 50, 25, 25
-                                }
-                                if ($Report.ShowTableCaptions) {
-                                    $TableParams['Caption'] = "- $($TableParams.Name)"
-                                }
-                                $SecurityProfile | Table @TableParams
                             }
                             #endregion ESXi Host Image Profile Information
 
                             #region ESXi Host Time Configuration
-                            Section -Style Heading3 'Time Configuration' {
-                                $VMHostTimeSettings = [PSCustomObject]@{
-                                    'Time Zone' = $VMHost.timezone
-                                    'NTP Service' = Switch ((Get-VMHostService -VMHost $VMHost | Where-Object { $_.key -eq 'ntpd' }).Running) {
-                                        $true { 'Running' }
-                                        $false { 'Stopped' }
+                            Try {
+                                Section -Style Heading3 'Time Configuration' {
+                                    $VMHostTimeSettings = [PSCustomObject]@{
+                                        'Time Zone' = $VMHost.timezone
+                                        'NTP Service' = Switch ((Get-VMHostService -VMHost $VMHost | Where-Object { $_.key -eq 'ntpd' }).Running) {
+                                            $true { 'Running' }
+                                            $false { 'Stopped' }
+                                        }
+                                        'NTP Server(s)' = (Get-VMHostNtpServer -VMHost $VMHost | Sort-Object) -join ', '
                                     }
-                                    'NTP Server(s)' = (Get-VMHostNtpServer -VMHost $VMHost | Sort-Object) -join ', '
+                                    if ($Healthcheck.VMHost.NTP) {
+                                        $VMHostTimeSettings | Where-Object { $_.'NTP Service' -eq 'Stopped' } | Set-Style -Style Critical -Property 'NTP Service'
+                                    }
+                                    $TableParams = @{
+                                        Name = "Time Configuration - $($VMHost.ExtensionData.Name)"
+                                        ColumnWidths = 33, 34, 33
+                                    }
+                                    if ($Report.ShowTableCaptions) {
+                                        $TableParams['Caption'] = "- $($TableParams.Name)"
+                                    }
+                                    $VMHostTimeSettings | Table @TableParams
                                 }
-                                if ($Healthcheck.VMHost.NTP) {
-                                    $VMHostTimeSettings | Where-Object { $_.'NTP Service' -eq 'Stopped' } | Set-Style -Style Critical -Property 'NTP Service'
-                                }
-                                $TableParams = @{
-                                    Name = "Time Configuration - $($VMHost.ExtensionData.Name)"
-                                    ColumnWidths = 30, 30, 40
-                                }
-                                if ($Report.ShowTableCaptions) {
-                                    $TableParams['Caption'] = "- $($TableParams.Name)"
-                                }
-                                $VMHostTimeSettings | Table @TableParams
+                            } Catch {
+                                Write-PScriboMessage -IsWarning "$($_.Exception.Message)"
                             }
                             #endregion ESXi Host Time Configuration
 
                             #region ESXi Host Syslog Configuration
                             $SyslogConfig = $VMHost | Get-VMHostSysLogServer
                             if ($SyslogConfig) {
-                                Section -Style Heading3 'Syslog Configuration' {
-                                    # TODO: Syslog Rotate & Size, Log Directory (Adv Settings)
-                                    $SyslogConfig = $SyslogConfig | Select-Object @{L = 'SysLog Server'; E = { $_.Host } }, Port
-                                    $TableParams = @{
-                                        Name = "Syslog Configuration - $($VMHost.ExtensionData.Name)"
-                                        ColumnWidths = 50, 50
+                                Try {
+                                    Section -Style Heading3 'Syslog Configuration' {
+                                        # TODO: Syslog Rotate & Size, Log Directory (Adv Settings)
+                                        $SyslogConfig = $SyslogConfig | Select-Object @{L = 'SysLog Server'; E = { $_.Host } }, Port
+                                        $TableParams = @{
+                                            Name = "Syslog Configuration - $($VMHost.ExtensionData.Name)"
+                                            ColumnWidths = 50, 50
+                                        }
+                                        if ($Report.ShowTableCaptions) {
+                                            $TableParams['Caption'] = "- $($TableParams.Name)"
+                                        }
+                                        $SyslogConfig | Table @TableParams
                                     }
-                                    if ($Report.ShowTableCaptions) {
-                                        $TableParams['Caption'] = "- $($TableParams.Name)"
-                                    }
-                                    $SyslogConfig | Table @TableParams
+                                } Catch {
+                                    Write-PScriboMessage -IsWarning "$($_.Exception.Message)"
                                 }
                             }
                             #endregion ESXi Host Syslog Configuration
@@ -334,290 +421,210 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                             #region ESXi Host Comprehensive Information Section
                             if ($InfoLevel.VMHost -ge 5) {
                                 #region ESXi Host Advanced System Settings
-                                Section -Style Heading3 'Advanced System Settings' {
-                                    $AdvSettings = $VMHost | Get-AdvancedSetting | Select-Object Name, Value
-                                    $TableParams = @{
-                                        Name = "Advanced System Settings - $($VMHost.ExtensionData.Name)"
-                                        ColumnWidths = 50, 50
+                                Try {
+                                    Section -Style Heading3 'Advanced System Settings' {
+                                        $AdvSettings = $VMHost | Get-AdvancedSetting | Select-Object Name, Value
+                                        $TableParams = @{
+                                            Name = "Advanced System Settings - $($VMHost.ExtensionData.Name)"
+                                            ColumnWidths = 40, 60
+                                        }
+                                        if ($Report.ShowTableCaptions) {
+                                            $TableParams['Caption'] = "- $($TableParams.Name)"
+                                        }
+                                        $AdvSettings | Sort-Object Name | Table @TableParams
                                     }
-                                    if ($Report.ShowTableCaptions) {
-                                        $TableParams['Caption'] = "- $($TableParams.Name)"
-                                    }
-                                    $AdvSettings | Sort-Object Name | Table @TableParams
+                                } Catch {
+                                    Write-PScriboMessage -IsWarning "$($_.Exception.Message)"
                                 }
                                 #endregion ESXi Host Advanced System Settings
 
                                 #region ESXi Host Software VIBs
-                                Section -Style Heading3 'Software VIBs' {
-                                    $esxcli = Get-EsxCli -VMHost $VMHost -V2
-                                    $VMHostVibs = $esxcli.software.vib.list.Invoke()
-                                    $VMHostVibs = foreach ($VMHostVib in $VMHostVibs) {
-                                        [PSCustomObject]@{
-                                            'VIB' = $VMHostVib.Name
-                                            'ID' = $VMHostVib.Id
-                                            'Version' = $VMHostVib.Version
-                                            'Acceptance Level' = $VMHostVib.AcceptanceLevel
-                                            'Creation Date' = $VMHostVib.CreationDate
-                                            'Install Date' = $VMHostVib.InstallDate
+                                Try {
+                                    Section -Style Heading3 'Software VIBs' {
+                                        $VMHostVibs = $esxcli.software.vib.list.Invoke()
+                                        $VMHostVibs = foreach ($VMHostVib in $VMHostVibs) {
+                                            [PSCustomObject]@{
+                                                'VIB' = $VMHostVib.Name
+                                                'ID' = $VMHostVib.Id
+                                                'Version' = $VMHostVib.Version
+                                                'Acceptance Level' = $VMHostVib.AcceptanceLevel
+                                                'Creation Date' = $VMHostVib.CreationDate
+                                                'Install Date' = $VMHostVib.InstallDate
+                                            }
                                         }
+                                        $TableParams = @{
+                                            Name = "Software VIBs - $($VMHost.ExtensionData.Name)"
+                                            ColumnWidths = 15, 25, 15, 15, 15, 15
+                                        }
+                                        if ($Report.ShowTableCaptions) {
+                                            $TableParams['Caption'] = "- $($TableParams.Name)"
+                                        }
+                                        $VMHostVibs | Sort-Object 'Install Date' -Descending | Table @TableParams
                                     }
-                                    $TableParams = @{
-                                        Name = "Software VIBs - $($VMHost.ExtensionData.Name)"
-                                        ColumnWidths = 15, 25, 15, 15, 15, 15
-                                    }
-                                    if ($Report.ShowTableCaptions) {
-                                        $TableParams['Caption'] = "- $($TableParams.Name)"
-                                    }
-                                    $VMHostVibs | Sort-Object 'Install Date' -Descending | Table @TableParams
+                                } Catch {
+                                    Write-PScriboMessage -IsWarning "$($_.Exception.Message)"
                                 }
                                 #endregion ESXi Host Software VIBs
                             }
                             #endregion ESXi Host Comprehensive Information Section
                         }
-                        #endregion ESXi Host System Section
+                    }
+                    #endregion ESXi Host System Section
 
-                        #region ESXi Host Storage Section
-                        if ($InfoLevel.Storage -ge 1) {
-                            Section -Style Heading2 'Storage' {
-                                Paragraph "The following section details the host storage configuration for $($VMHost.ExtensionData.Name)."
+                    #region ESXi Host Storage Section
+                    if ($InfoLevel.Storage -ge 1) {
+                        Section -Style Heading2 'Storage' {
+                            Paragraph "The following section details the host storage configuration for $($VMHost.ExtensionData.Name)."
 
-                                #region Datastore Section
-                                Write-PScriboMessage "Storage InfoLevel set at $($InfoLevel.Storage)."
+                            #region Datastore Section
+                            Write-PScriboMessage "Storage InfoLevel set at $($InfoLevel.Storage)."
 
-                                if ($Datastores) {
-                                    Section -Style Heading3 'Datastores' {
-                                        #region Datastore Infomative Information
-                                        if (($InfoLevel.Storage -ge 1) -and ($InfoLevel.Storage -lt 3)) {
-                                            $DatastoreInfo = foreach ($Datastore in $Datastores) {
-                                                [PSCustomObject]@{
+                            if ($Datastores) {
+                                Section -Style Heading3 'Datastores' {
+                                    #region Datastore Infomative Information
+                                    if (($InfoLevel.Storage -ge 1) -and ($InfoLevel.Storage -lt 3)) {
+                                        $DatastoreInfo = foreach ($Datastore in $Datastores) {
+                                            [PSCustomObject]@{
+                                                'Datastore' = $Datastore.Name
+                                                'Type' = $Datastore.Type
+                                                'Version' = Switch ($Datastore.FileSystemVersion) {
+                                                    $null { '--' }
+                                                    default { $Datastore.FileSystemVersion }
+                                                }
+                                                '# of VMs' = $Datastore.ExtensionData.VM.Count
+                                                'Total Capacity GB' = [math]::Round($Datastore.CapacityGB, 2)
+                                                'Used Capacity GB' = [math]::Round((($Datastore.CapacityGB) - ($Datastore.FreeSpaceGB)), 2)
+                                                'Free Space GB' = [math]::Round($Datastore.FreeSpaceGB, 2)
+                                                '% Used' = [math]::Round((100 - (($Datastore.FreeSpaceGB) / ($Datastore.CapacityGB) * 100)), 2)
+                                            }
+                                        }
+                                        if ($Healthcheck.Datastore.CapacityUtilization) {
+                                            $DatastoreInfo | Where-Object { $_.'% Used' -ge 90 } | Set-Style -Style Critical -Property '% Used'
+                                            $DatastoreInfo | Where-Object { $_.'% Used' -ge 75 -and $_.'% Used' -lt 90 } | Set-Style -Style Warning -Property '% Used'
+                                        }
+                                        $TableParams = @{
+                                            Name = "Datastores - $($VMHost.ExtensionData.Name)"
+                                            ColumnWidths = 20, 8, 9, 8, 15, 15, 15, 10
+                                        }
+                                        if ($Report.ShowTableCaptions) {
+                                            $TableParams['Caption'] = "- $($TableParams.Name)"
+                                        }
+                                        $DatastoreInfo | Sort-Object 'Datastore' | Table @TableParams
+                                    }
+                                    #endregion Datastore Advanced Summary
+
+                                    #region Datastore Detailed Information
+                                    if ($InfoLevel.Storage -ge 3) {
+                                        foreach ($Datastore in $Datastores) {
+                                            #region Datastore Section
+                                            Section -Style Heading4 $Datastore.Name {
+                                                $DatastoreDetail = [PSCustomObject]@{
                                                     'Datastore' = $Datastore.Name
+                                                    'ID' = $Datastore.Id
                                                     'Type' = $Datastore.Type
                                                     'Version' = Switch ($Datastore.FileSystemVersion) {
                                                         $null { '--' }
                                                         default { $Datastore.FileSystemVersion }
                                                     }
-                                                    '# of VMs' = $Datastore.ExtensionData.VM.Count
-                                                    'Total Capacity GB' = [math]::Round($Datastore.CapacityGB, 2)
-                                                    'Used Capacity GB' = [math]::Round((($Datastore.CapacityGB) - ($Datastore.FreeSpaceGB)), 2)
-                                                    'Free Space GB' = [math]::Round($Datastore.FreeSpaceGB, 2)
+                                                    'State' = $Datastore.State
+                                                    'Number of VMs' = $Datastore.ExtensionData.VM.Count
+                                                    'Storage I/O Control' = Switch ($Datastore.StorageIOControlEnabled) {
+                                                        $true { 'Enabled' }
+                                                        $false { 'Disabled' }
+                                                    }
+                                                    'Congestion Threshold' = Switch ($Datastore.CongestionThresholdMillisecond) {
+                                                        $null { '--' }
+                                                        default { "$($Datastore.CongestionThresholdMillisecond) ms" }
+                                                    }
+                                                    'Total Capacity' = "$([math]::Round($Datastore.CapacityGB, 2)) GB"
+                                                    'Used Capacity' = "$([math]::Round((($Datastore.CapacityGB) - ($Datastore.FreeSpaceGB)), 2)) GB"
+                                                    'Free Space' = "$([math]::Round($Datastore.FreeSpaceGB, 2)) GB"
                                                     '% Used' = [math]::Round((100 - (($Datastore.FreeSpaceGB) / ($Datastore.CapacityGB) * 100)), 2)
                                                 }
-                                            }
-                                            if ($Healthcheck.Datastore.CapacityUtilization) {
-                                                $DatastoreInfo | Where-Object { $_.'% Used' -ge 90 } | Set-Style -Style Critical -Property '% Used'
-                                                $DatastoreInfo | Where-Object { $_.'% Used' -ge 75 -and $_.'% Used' -lt 90 } | Set-Style -Style Warning -Property '% Used'
-                                            }
-                                            $TableParams = @{
-                                                Name = "Datastores - $($VMHost.ExtensionData.Name)"
-                                                ColumnWidths = 20, 8, 9, 8, 15, 15, 15, 10
-                                            }
-                                            if ($Report.ShowTableCaptions) {
-                                                $TableParams['Caption'] = "- $($TableParams.Name)"
-                                            }
-                                            $DatastoreInfo | Sort-Object 'Datastore' | Table @TableParams
-                                        }
-                                        #endregion Datastore Advanced Summary
-
-                                        #region Datastore Detailed Information
-                                        if ($InfoLevel.Storage -ge 3) {
-                                            foreach ($Datastore in $Datastores) {
-                                                #region Datastore Section
-                                                Section -Style Heading4 $Datastore.Name {
-                                                    $DatastoreDetail = [PSCustomObject]@{
-                                                        'Datastore' = $Datastore.Name
-                                                        'ID' = $Datastore.Id
-                                                        'Type' = $Datastore.Type
-                                                        'Version' = Switch ($Datastore.FileSystemVersion) {
-                                                            $null { '--' }
-                                                            default { $Datastore.FileSystemVersion }
-                                                        }
-                                                        'State' = $Datastore.State
-                                                        'Number of VMs' = $Datastore.ExtensionData.VM.Count
-                                                        'Storage I/O Control' = Switch ($Datastore.StorageIOControlEnabled) {
-                                                            $true { 'Enabled' }
-                                                            $false { 'Disabled' }
-                                                        }
-                                                        'Congestion Threshold' = Switch ($Datastore.CongestionThresholdMillisecond) {
-                                                            $null { '--' }
-                                                            default { "$($Datastore.CongestionThresholdMillisecond) ms" }
-                                                        }
-                                                        'Total Capacity' = "$([math]::Round($Datastore.CapacityGB, 2)) GB"
-                                                        'Used Capacity' = "$([math]::Round((($Datastore.CapacityGB) - ($Datastore.FreeSpaceGB)), 2)) GB"
-                                                        'Free Space' = "$([math]::Round($Datastore.FreeSpaceGB, 2)) GB"
-                                                        '% Used' = [math]::Round((100 - (($Datastore.FreeSpaceGB) / ($Datastore.CapacityGB) * 100)), 2)
-                                                    }
-                                                    if ($Healthcheck.Datastore.CapacityUtilization) {
-                                                        $DatastoreDetail | Where-Object { $_.'% Used' -ge 90 } | Set-Style -Style Critical -Property '% Used'
-                                                        $DatastoreDetail | Where-Object { $_.'% Used' -ge 75 -and
-                                                            $_.'% Used' -lt 90 } | Set-Style -Style Warning -Property '% Used'
-                                                    }
-
-                                                    #region Datastore Advanced Detailed Information
-                                                    if ($InfoLevel.Storage -ge 4) {
-                                                        $MemberProps = @{
-                                                            'InputObject' = $DatastoreDetail
-                                                            'MemberType' = 'NoteProperty'
-                                                        }
-                                                        $DatastoreVMs = foreach ($DatastoreVM in $Datastore.ExtensionData.VM) {
-                                                            $VMLookup."$($DatastoreVM.Type)-$($DatastoreVM.Value)"
-                                                        }
-                                                        Add-Member @MemberProps -Name 'Virtual Machines' -Value (($DatastoreVMs | Sort-Object) -join ', ')
-                                                    }
-                                                    #endregion Datastore Advanced Detailed Information
-                                                    $TableParams = @{
-                                                        Name = "Datastore $($Datastore.Name) - $($VMHost.ExtensionData.Name)"
-                                                        List = $true
-                                                        ColumnWidths = 50, 50
-                                                    }
-                                                    if ($Report.ShowTableCaptions) {
-                                                        $TableParams['Caption'] = "- $($TableParams.Name)"
-                                                    }
-                                                    $DatastoreDetail | Sort-Object Datacenter, Datastore | Table @TableParams
-
-                                                    # Get VMFS volumes. Ignore local SCSILuns.
-                                                    if (($Datastore.Type -eq 'VMFS') -and ($Datastore.ExtensionData.Info.Vmfs.Local -eq $false)) {
-                                                        #region SCSI LUN Information Section
-                                                        Section -Style Heading4 'SCSI LUNs' {
-                                                            $ScsiLuns = foreach ($DatastoreHost in $Datastore.ExtensionData.Host.Key) {
-                                                                $DiskName = $Datastore.ExtensionData.Info.Vmfs.Extent.DiskName
-                                                                $ScsiDeviceDetailProps = @{
-                                                                    'VMHosts' = $VMHost
-                                                                    'VMHostMoRef' = "$($DatastoreHost.Type)-$($DatastoreHost.Value)"
-                                                                    'DatastoreDiskName' = $DiskName
-                                                                }
-                                                                $ScsiDeviceDetail = Get-ScsiDeviceDetail @ScsiDeviceDetailProps
-
-                                                                [PSCustomObject]@{
-                                                                    'Host' = $VMHostLookup."$($DatastoreHost.Type)-$($DatastoreHost.Value)"
-                                                                    'Canonical Name' = $DiskName
-                                                                    'Capacity GB' = $ScsiDeviceDetail.CapacityGB
-                                                                    'Vendor' = $ScsiDeviceDetail.Vendor
-                                                                    'Model' = $ScsiDeviceDetail.Model
-                                                                    'Is SSD' = $ScsiDeviceDetail.Ssd
-                                                                    'Multipath Policy' = $ScsiDeviceDetail.MultipathPolicy
-                                                                    'Paths' = $ScsiDeviceDetail.Paths
-                                                                }
-                                                            }
-                                                            $TableParams = @{
-                                                                Name = "SCSI LUNs - $($VMHost.ExtensionData.Name)"
-                                                                ColumnWidths = 18, 18, 10, 14, 12, 8, 12, 8
-                                                            }
-                                                            if ($Report.ShowTableCaptions) {
-                                                                $TableParams['Caption'] = "- $($TableParams.Name)"
-                                                            }
-                                                            $ScsiLuns | Sort-Object Host | Table @TableParams
-                                                        }
-                                                        #endregion SCSI LUN Information Section
-                                                    }
+                                                if ($Healthcheck.Datastore.CapacityUtilization) {
+                                                    $DatastoreDetail | Where-Object { $_.'% Used' -ge 90 } | Set-Style -Style Critical -Property '% Used'
+                                                    $DatastoreDetail | Where-Object { $_.'% Used' -ge 75 -and
+                                                        $_.'% Used' -lt 90 } | Set-Style -Style Warning -Property '% Used'
                                                 }
-                                                #endregion Datastore Section
-                                            }
-                                        }
-                                        #endregion Datastore Detailed Information
-                                    }
-                                }
-                                #endregion Datastore Section
 
-                                #region ESXi Host Storage Adapter Information
-                                $VMHostHbas = $VMHost | Get-VMHostHba | Sort-Object Device
-                                if ($VMHostHbas) {
-                                    #region ESXi Host Storage Adapters Section
-                                    Section -Style Heading3 'Storage Adapters' {
-                                        if ($InfoLevel.VMHost -ge 3) {
-                                            foreach ($VMHostHba in $VMHostHbas) {
-                                                $Target = ((Get-View $VMHostHba.VMhost).Config.StorageDevice.ScsiTopology.Adapter | Where-Object { $_.Adapter -eq $VMHostHba.Key }).Target
-                                                $LUNs = Get-ScsiLun -Hba $VMHostHba -LunType "disk" -ErrorAction SilentlyContinue
-                                                $Paths = ($Target | ForEach-Object { $_.Lun.Count } | Measure-Object -Sum)
-                                                Section -Style Heading4 "$($VMHostHba.Device)" {
-                                                    $VMHostStorageAdapter = [PSCustomObject]@{
-                                                        'Adapter' = $VMHostHba.Device
-                                                        'Type' = Switch ($VMHostHba.Type) {
-                                                            'FibreChannel' { 'Fibre Channel' }
-                                                            'IScsi' { 'iSCSI' }
-                                                            'ParallelScsi' { 'Parallel SCSI' }
-                                                            default { $TextInfo.ToTitleCase($VMHostHba.Type) }
-                                                        }
-                                                        'Model' = $VMHostHba.Model
-                                                        'Status' = $TextInfo.ToTitleCase($VMHostHba.Status)
-                                                        'Targets' = $Target.Count
-                                                        'Devices' = $LUNs.Count
-                                                        'Paths' = $Paths.Sum
-                                                    }
+                                                #region Datastore Advanced Detailed Information
+                                                if ($InfoLevel.Storage -ge 4) {
                                                     $MemberProps = @{
-                                                        'InputObject' = $VMHostStorageAdapter
+                                                        'InputObject' = $DatastoreDetail
                                                         'MemberType' = 'NoteProperty'
                                                     }
-                                                    if ($VMHostStorageAdapter.Type -eq 'iSCSI') {
-                                                        $iScsiAuthenticationMethod = Switch ($VMHostHba.ExtensionData.AuthenticationProperties.ChapAuthenticationType) {
-                                                            'chapProhibited' { 'None' }
-                                                            'chapPreferred' { 'Use unidirectional CHAP unless prohibited by target' }
-                                                            'chapDiscouraged' { 'Use unidirectional CHAP if required by target' }
-                                                            'chapRequired' {
-                                                                Switch ($VMHostHba.ExtensionData.AuthenticationProperties.MutualChapAuthenticationType) {
-                                                                    'chapProhibited' { 'Use unidirectional CHAP' }
-                                                                    'chapRequired' { 'Use bidirectional CHAP' }
-                                                                }
+                                                    $DatastoreVMs = foreach ($DatastoreVM in $Datastore.ExtensionData.VM) {
+                                                        $VMLookup."$($DatastoreVM.Type)-$($DatastoreVM.Value)"
+                                                    }
+                                                    Add-Member @MemberProps -Name 'Virtual Machines' -Value (($DatastoreVMs | Sort-Object) -join ', ')
+                                                }
+                                                #endregion Datastore Advanced Detailed Information
+                                                $TableParams = @{
+                                                    Name = "Datastore $($Datastore.Name) - $($VMHost.ExtensionData.Name)"
+                                                    List = $true
+                                                    ColumnWidths = 40, 60
+                                                }
+                                                if ($Report.ShowTableCaptions) {
+                                                    $TableParams['Caption'] = "- $($TableParams.Name)"
+                                                }
+                                                $DatastoreDetail | Sort-Object Datacenter, Datastore | Table @TableParams
+
+                                                # Get VMFS volumes. Ignore local SCSILuns.
+                                                if (($Datastore.Type -eq 'VMFS') -and ($Datastore.ExtensionData.Info.Vmfs.Local -eq $false)) {
+                                                    #region SCSI LUN Information Section
+                                                    Section -Style Heading4 'SCSI LUNs' {
+                                                        $ScsiLuns = foreach ($DatastoreHost in $Datastore.ExtensionData.Host.Key) {
+                                                            $DiskName = $Datastore.ExtensionData.Info.Vmfs.Extent.DiskName
+                                                            $ScsiDeviceDetailProps = @{
+                                                                'VMHosts' = $VMHost
+                                                                'VMHostMoRef' = "$($DatastoreHost.Type)-$($DatastoreHost.Value)"
+                                                                'DatastoreDiskName' = $DiskName
                                                             }
-                                                            default { $VMHostHba.ExtensionData.AuthenticationProperties.ChapAuthenticationType }
+                                                            $ScsiDeviceDetail = Get-ScsiDeviceDetail @ScsiDeviceDetailProps
+
+                                                            [PSCustomObject]@{
+                                                                'Host' = $VMHostLookup."$($DatastoreHost.Type)-$($DatastoreHost.Value)"
+                                                                'Canonical Name' = $DiskName
+                                                                'Capacity GB' = $ScsiDeviceDetail.CapacityGB
+                                                                'Vendor' = $ScsiDeviceDetail.Vendor
+                                                                'Model' = $ScsiDeviceDetail.Model
+                                                                'Is SSD' = $ScsiDeviceDetail.Ssd
+                                                                'Multipath Policy' = $ScsiDeviceDetail.MultipathPolicy
+                                                                'Paths' = $ScsiDeviceDetail.Paths
+                                                            }
                                                         }
-                                                        Add-Member @MemberProps -Name 'iSCSI Name' -Value $VMHostHba.IScsiName
-                                                        if ($VMHostHba.IScsiAlias) {
-                                                            Add-Member @MemberProps -Name 'iSCSI Alias' -Value $VMHostHba.IScsiAlias
-                                                        } else {
-                                                            Add-Member @MemberProps -Name 'iSCSI Alias' -Value '--'
+                                                        $TableParams = @{
+                                                            Name = "SCSI LUNs - $($VMHost.ExtensionData.Name)"
+                                                            ColumnWidths = 18, 18, 10, 14, 12, 8, 12, 8
                                                         }
-                                                        if ($VMHostHba.CurrentSpeedMb) {
-                                                            Add-Member @MemberProps -Name 'Speed' -Value "$($VMHostHba.CurrentSpeedMb) Mb"
-                                                        } else {
-                                                            Add-Member @MemberProps -Name 'Speed' -Value '--'
+                                                        if ($Report.ShowTableCaptions) {
+                                                            $TableParams['Caption'] = "- $($TableParams.Name)"
                                                         }
-                                                        if ($VMHostHba.ExtensionData.ConfiguredSendTarget) {
-                                                            Add-Member @MemberProps -Name 'Dynamic Discovery' -Value (($VMHostHba.ExtensionData.ConfiguredSendTarget | ForEach-Object { "$($_.Address)" + ":" + "$($_.Port)" }) -join [Environment]::NewLine)
-                                                        } else {
-                                                            Add-Member @MemberProps -Name 'Dynamic Discovery' -Value '--'
-                                                        }
-                                                        if ($VMHostHba.ExtensionData.ConfiguredStaticTarget) {
-                                                            Add-Member @MemberProps -Name 'Static Discovery' -Value (($VMHostHba.ExtensionData.ConfiguredStaticTarget | ForEach-Object { "$($_.Address)" + ":" + "$($_.Port)" + "  " + "$($_.IScsiName)" }) -join [Environment]::NewLine)
-                                                        } else {
-                                                            Add-Member @MemberProps -Name 'Static Discovery' -Value '--'
-                                                        }
-                                                        if ($iScsiAuthenticationMethod -eq 'None') {
-                                                            Add-Member @MemberProps -Name 'Authentication Method' -Value $iScsiAuthenticationMethod
-                                                        } elseif ($iScsiAuthenticationMethod -eq 'Use bidirectional CHAP') {
-                                                            Add-Member @MemberProps -Name 'Authentication Method' -Value $iScsiAuthenticationMethod
-                                                            Add-Member @MemberProps -Name 'Outgoing CHAP Name' -Value $VMHostHba.ExtensionData.AuthenticationProperties.ChapName
-                                                            Add-Member @MemberProps -Name 'Incoming CHAP Name' -Value $VMHostHba.ExtensionData.AuthenticationProperties.MutualChapName
-                                                        } else {
-                                                            Add-Member @MemberProps -Name 'Authentication Method' -Value $iScsiAuthenticationMethod
-                                                            Add-Member @MemberProps -Name 'Outgoing CHAP Name' -Value $VMHostHba.ExtensionData.AuthenticationProperties.ChapName
-                                                        }
-                                                        if ($InfoLevel.VMHost -eq 4) {
-                                                            Add-Member @MemberProps -Name 'Advanced Options' -Value (($VMHostHba.ExtensionData.AdvancedOptions | ForEach-Object { "$($_.Key) = $($_.Value)" }) -join [Environment]::NewLine)
-                                                        }
+                                                        $ScsiLuns | Sort-Object Host | Table @TableParams
                                                     }
-                                                    if ($VMHostStorageAdapter.Type -eq 'Fibre Channel') {
-                                                        Add-Member @MemberProps -Name 'Node WWN' -Value (([String]::Format("{0:X}", $VMHostHba.NodeWorldWideName) -split "(\w{2})" | Where-Object { $_ -ne "" }) -join ":")
-                                                        Add-Member @MemberProps -Name 'Port WWN' -Value (([String]::Format("{0:X}", $VMHostHba.PortWorldWideName) -split "(\w{2})" | Where-Object { $_ -ne "" }) -join ":")
-                                                        Add-Member @MemberProps -Name 'Speed' -Value $VMHostHba.Speed
-                                                    }
-                                                    if ($Healthcheck.VMHost.StorageAdapter) {
-                                                        $VMHostStorageAdapter | Where-Object { $_.'Status' -ne 'Online' } | Set-Style -Style Warning -Property 'Status'
-                                                        $VMHostStorageAdapter | Where-Object { $_.'Status' -eq 'Offline' } | Set-Style -Style Critical -Property 'Status'
-                                                    }
-                                                    $TableParams = @{
-                                                        Name = "Storage Adapter $($VMHostStorageAdapter.Adapter) - $($VMHost.ExtensionData.Name)"
-                                                        List = $true
-                                                        ColumnWidths = 25, 75
-                                                    }
-                                                    if ($Report.ShowTableCaptions) {
-                                                        $TableParams['Caption'] = "- $($TableParams.Name)"
-                                                    }
-                                                    $VMHostStorageAdapter | Table @TableParams
+                                                    #endregion SCSI LUN Information Section
                                                 }
                                             }
-                                        } else {
-                                            $VMHostStorageAdapters = foreach ($VMHostHba in $VMHostHbas) {
-                                                [PSCustomObject]@{
+                                            #endregion Datastore Section
+                                        }
+                                    }
+                                    #endregion Datastore Detailed Information
+                                }
+                            }
+                            #endregion Datastore Section
+
+                            #region ESXi Host Storage Adapter Information
+                            $VMHostHbas = $VMHost | Get-VMHostHba | Sort-Object Device
+                            if ($VMHostHbas) {
+                                #region ESXi Host Storage Adapters Section
+                                Section -Style Heading3 'Storage Adapters' {
+                                    if ($InfoLevel.VMHost -ge 3) {
+                                        foreach ($VMHostHba in $VMHostHbas) {
+                                            $Target = ((Get-View $VMHostHba.VMhost).Config.StorageDevice.ScsiTopology.Adapter | Where-Object { $_.Adapter -eq $VMHostHba.Key }).Target
+                                            $LUNs = Get-ScsiLun -Hba $VMHostHba -LunType "disk" -ErrorAction SilentlyContinue
+                                            $Paths = ($Target | ForEach-Object { $_.Lun.Count } | Measure-Object -Sum)
+                                            Section -Style Heading4 "$($VMHostHba.Device)" {
+                                                $VMHostStorageAdapter = [PSCustomObject]@{
                                                     'Adapter' = $VMHostHba.Device
                                                     'Type' = Switch ($VMHostHba.Type) {
                                                         'FibreChannel' { 'Fibre Channel' }
@@ -627,29 +634,116 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                                     }
                                                     'Model' = $VMHostHba.Model
                                                     'Status' = $TextInfo.ToTitleCase($VMHostHba.Status)
+                                                    'Targets' = $Target.Count
+                                                    'Devices' = $LUNs.Count
+                                                    'Paths' = $Paths.Sum
                                                 }
+                                                $MemberProps = @{
+                                                    'InputObject' = $VMHostStorageAdapter
+                                                    'MemberType' = 'NoteProperty'
+                                                }
+                                                if ($VMHostStorageAdapter.Type -eq 'iSCSI') {
+                                                    $iScsiAuthenticationMethod = Switch ($VMHostHba.ExtensionData.AuthenticationProperties.ChapAuthenticationType) {
+                                                        'chapProhibited' { 'None' }
+                                                        'chapPreferred' { 'Use unidirectional CHAP unless prohibited by target' }
+                                                        'chapDiscouraged' { 'Use unidirectional CHAP if required by target' }
+                                                        'chapRequired' {
+                                                            Switch ($VMHostHba.ExtensionData.AuthenticationProperties.MutualChapAuthenticationType) {
+                                                                'chapProhibited' { 'Use unidirectional CHAP' }
+                                                                'chapRequired' { 'Use bidirectional CHAP' }
+                                                            }
+                                                        }
+                                                        default { $VMHostHba.ExtensionData.AuthenticationProperties.ChapAuthenticationType }
+                                                    }
+                                                    Add-Member @MemberProps -Name 'iSCSI Name' -Value $VMHostHba.IScsiName
+                                                    if ($VMHostHba.IScsiAlias) {
+                                                        Add-Member @MemberProps -Name 'iSCSI Alias' -Value $VMHostHba.IScsiAlias
+                                                    } else {
+                                                        Add-Member @MemberProps -Name 'iSCSI Alias' -Value '--'
+                                                    }
+                                                    if ($VMHostHba.CurrentSpeedMb) {
+                                                        Add-Member @MemberProps -Name 'Speed' -Value "$($VMHostHba.CurrentSpeedMb) Mb"
+                                                    } else {
+                                                        Add-Member @MemberProps -Name 'Speed' -Value '--'
+                                                    }
+                                                    if ($VMHostHba.ExtensionData.ConfiguredSendTarget) {
+                                                        Add-Member @MemberProps -Name 'Dynamic Discovery' -Value (($VMHostHba.ExtensionData.ConfiguredSendTarget | ForEach-Object { "$($_.Address)" + ":" + "$($_.Port)" }) -join [Environment]::NewLine)
+                                                    } else {
+                                                        Add-Member @MemberProps -Name 'Dynamic Discovery' -Value '--'
+                                                    }
+                                                    if ($VMHostHba.ExtensionData.ConfiguredStaticTarget) {
+                                                        Add-Member @MemberProps -Name 'Static Discovery' -Value (($VMHostHba.ExtensionData.ConfiguredStaticTarget | ForEach-Object { "$($_.Address)" + ":" + "$($_.Port)" + "  " + "$($_.IScsiName)" }) -join [Environment]::NewLine)
+                                                    } else {
+                                                        Add-Member @MemberProps -Name 'Static Discovery' -Value '--'
+                                                    }
+                                                    if ($iScsiAuthenticationMethod -eq 'None') {
+                                                        Add-Member @MemberProps -Name 'Authentication Method' -Value $iScsiAuthenticationMethod
+                                                    } elseif ($iScsiAuthenticationMethod -eq 'Use bidirectional CHAP') {
+                                                        Add-Member @MemberProps -Name 'Authentication Method' -Value $iScsiAuthenticationMethod
+                                                        Add-Member @MemberProps -Name 'Outgoing CHAP Name' -Value $VMHostHba.ExtensionData.AuthenticationProperties.ChapName
+                                                        Add-Member @MemberProps -Name 'Incoming CHAP Name' -Value $VMHostHba.ExtensionData.AuthenticationProperties.MutualChapName
+                                                    } else {
+                                                        Add-Member @MemberProps -Name 'Authentication Method' -Value $iScsiAuthenticationMethod
+                                                        Add-Member @MemberProps -Name 'Outgoing CHAP Name' -Value $VMHostHba.ExtensionData.AuthenticationProperties.ChapName
+                                                    }
+                                                    if ($InfoLevel.VMHost -eq 4) {
+                                                        Add-Member @MemberProps -Name 'Advanced Options' -Value (($VMHostHba.ExtensionData.AdvancedOptions | ForEach-Object { "$($_.Key) = $($_.Value)" }) -join [Environment]::NewLine)
+                                                    }
+                                                }
+                                                if ($VMHostStorageAdapter.Type -eq 'Fibre Channel') {
+                                                    Add-Member @MemberProps -Name 'Node WWN' -Value (([String]::Format("{0:X}", $VMHostHba.NodeWorldWideName) -split "(\w{2})" | Where-Object { $_ -ne "" }) -join ":")
+                                                    Add-Member @MemberProps -Name 'Port WWN' -Value (([String]::Format("{0:X}", $VMHostHba.PortWorldWideName) -split "(\w{2})" | Where-Object { $_ -ne "" }) -join ":")
+                                                    Add-Member @MemberProps -Name 'Speed' -Value $VMHostHba.Speed
+                                                }
+                                                if ($Healthcheck.VMHost.StorageAdapter) {
+                                                    $VMHostStorageAdapter | Where-Object { $_.'Status' -ne 'Online' } | Set-Style -Style Warning -Property 'Status'
+                                                    $VMHostStorageAdapter | Where-Object { $_.'Status' -eq 'Offline' } | Set-Style -Style Critical -Property 'Status'
+                                                }
+                                                $TableParams = @{
+                                                    Name = "Storage Adapter $($VMHostStorageAdapter.Adapter) - $($VMHost.ExtensionData.Name)"
+                                                    List = $true
+                                                    ColumnWidths = 25, 75
+                                                }
+                                                if ($Report.ShowTableCaptions) {
+                                                    $TableParams['Caption'] = "- $($TableParams.Name)"
+                                                }
+                                                $VMHostStorageAdapter | Table @TableParams
                                             }
-                                            if ($Healthcheck.VMHost.StorageAdapter) {
-                                                $VMHostStorageAdapters | Where-Object { $_.'Status' -ne 'Online' } | Set-Style -Style Warning -Property 'Status'
-                                                $VMHostStorageAdapters | Where-Object { $_.'Status' -eq 'Offline' } | Set-Style -Style Critical -Property 'Status'
-                                            }
-                                            $TableParams = @{
-                                                Name = "Storage Adapters - $($VMHost.ExtensionData.Name)"
-                                                ColumnWidths = 25, 25, 25, 25
-                                            }
-                                            if ($Report.ShowTableCaptions) {
-                                                $TableParams['Caption'] = "- $($TableParams.Name)"
-                                            }
-                                            $VMHostStorageAdapters | Table @TableParams
                                         }
+                                    } else {
+                                        $VMHostStorageAdapters = foreach ($VMHostHba in $VMHostHbas) {
+                                            [PSCustomObject]@{
+                                                'Adapter' = $VMHostHba.Device
+                                                'Type' = Switch ($VMHostHba.Type) {
+                                                    'FibreChannel' { 'Fibre Channel' }
+                                                    'IScsi' { 'iSCSI' }
+                                                    'ParallelScsi' { 'Parallel SCSI' }
+                                                    default { $TextInfo.ToTitleCase($VMHostHba.Type) }
+                                                }
+                                                'Model' = $VMHostHba.Model
+                                                'Status' = $TextInfo.ToTitleCase($VMHostHba.Status)
+                                            }
+                                        }
+                                        if ($Healthcheck.VMHost.StorageAdapter) {
+                                            $VMHostStorageAdapters | Where-Object { $_.'Status' -ne 'Online' } | Set-Style -Style Warning -Property 'Status'
+                                            $VMHostStorageAdapters | Where-Object { $_.'Status' -eq 'Offline' } | Set-Style -Style Critical -Property 'Status'
+                                        }
+                                        $TableParams = @{
+                                            Name = "Storage Adapters - $($VMHost.ExtensionData.Name)"
+                                            ColumnWidths = 25, 25, 25, 25
+                                        }
+                                        if ($Report.ShowTableCaptions) {
+                                            $TableParams['Caption'] = "- $($TableParams.Name)"
+                                        }
+                                        $VMHostStorageAdapters | Table @TableParams
                                     }
-                                    #endregion ESXi Host Storage Adapters Section
                                 }
-                                #endregion ESXi Host Storage Adapter Information
+                                #endregion ESXi Host Storage Adapters Section
                             }
+                            #endregion ESXi Host Storage Adapter Information
                         }
-                        #endregion ESXi Host Storage Section
                     }
+                    #endregion ESXi Host Storage Section
 
                     #region ESXi Host Network Section
                     if ($InfoLevel.Network -ge 1) {
@@ -690,7 +784,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                             $TableParams = @{
                                 Name = "Network Configuration - $($VMHost.ExtensionData.Name)"
                                 List = $true
-                                ColumnWidths = 50, 50
+                                ColumnWidths = 40, 60
                             }
                             if ($Report.ShowTableCaptions) {
                                 $TableParams['Caption'] = "- $($TableParams.Name)"
@@ -754,7 +848,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                             $TableParams = @{
                                                 Name = "Physical Adapter $($VMHostPhysicalNetAdapter.Adapter) - $($VMHost.ExtensionData.Name)"
                                                 List = $true
-                                                ColumnWidths = 50, 50
+                                                ColumnWidths = 40, 60
                                             }
                                             if ($Report.ShowTableCaptions) {
                                                 $TableParams['Caption'] = "- $($TableParams.Name)"
@@ -781,7 +875,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                 Section -Style Heading3 'Cisco Discovery Protocol' {
                                     if ($InfoLevel.VMHost -ge 4) {
                                         foreach ($VMHostNetworkAdapter in $VMHostNetworkAdapterCDP) {
-                                            Section -Style Heading5 "$($VMHostNetworkAdapter.Device)" {
+                                            Section -Style NOTOCHeading5 -ExcludeFromToC "$($VMHostNetworkAdapter.Device)" {
                                                 $VMHostCDP = [PSCustomObject]@{
                                                     'Status' = $VMHostNetworkAdapter.Status
                                                     'System Name' = $VMHostNetworkAdapter.SystemName
@@ -797,7 +891,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                                 $TableParams = @{
                                                     Name = "Network Adapter $($VMHostNetworkAdapter.Device) CDP Information - $($VMHost.ExtensionData.Name)"
                                                     List = $true
-                                                    ColumnWidths = 50, 50
+                                                    ColumnWidths = 40, 60
                                                 }
                                                 if ($Report.ShowTableCaptions) {
                                                     $TableParams['Caption'] = "- $($TableParams.Name)"
@@ -835,7 +929,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                 Section -Style Heading3 'Link Layer Discovery Protocol' {
                                     if ($InfoLevel.VMHost -ge 4) {
                                         foreach ($VMHostNetworkAdapter in $VMHostNetworkAdapterLLDP) {
-                                            Section -Style Heading5 "$($VMHostNetworkAdapter.Device)" {
+                                            Section -Style NOTOCHeading5 -ExcludeFromToC "$($VMHostNetworkAdapter.Device)" {
                                                 $VMHostLLDP = [PSCustomObject]@{
                                                     'Chassis ID' = $VMHostNetworkAdapter.ChassisId
                                                     'Port ID' = $VMHostNetworkAdapter.PortId
@@ -850,7 +944,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                                 $TableParams = @{
                                                     Name = "Network Adapter $($VMHostNetworkAdapter.Device) LLDP Information - $($VMHost.ExtensionData.Name)"
                                                     List = $true
-                                                    ColumnWidths = 50, 50
+                                                    ColumnWidths = 40, 60
                                                 }
                                                 if ($Report.ShowTableCaptions) {
                                                     $TableParams['Caption'] = "- $($TableParams.Name)"
@@ -964,7 +1058,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                             $TableParams = @{
                                                 Name = "VMkernel Adapter $($VMkernelAdapter.Adapter) - $($VMHost.ExtensionData.Name)"
                                                 List = $true
-                                                ColumnWidths = 50, 50
+                                                ColumnWidths = 40, 60
                                             }
                                             if ($Report.ShowTableCaptions) {
                                                 $TableParams['Caption'] = "- $($TableParams.Name)"
@@ -990,7 +1084,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                             $VSSwitches = $VMHost | Get-VirtualSwitch -Standard | Sort-Object Name
                             if ($VSSwitches) {
                                 #region Section Standard Virtual Switches
-                                Section -Style Heading5 'Standard Virtual Switches' {
+                                Section -Style Heading3 'Standard Virtual Switches' {
                                     Paragraph "The following section details the standard virtual switch configuration for $($VMHost.ExtensionData.Name)."
                                     BlankLine
                                     $VSSwitchNicTeaming = $VSSwitches | Get-NicTeamingPolicy
@@ -1017,7 +1111,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                     $VssSecurity = $VSSwitches | Get-SecurityPolicy
                                     if ($VssSecurity) {
                                         #region Virtual Switch Security Policy
-                                        Section -Style Heading5 'Virtual Switch Security' {
+                                        Section -Style Heading4 'Virtual Switch Security' {
                                             $VssSecurity = foreach ($VssSec in $VssSecurity) {
                                                 [PSCustomObject]@{
                                                     'Virtual Switch' = $VssSec.VirtualSwitch
@@ -1049,7 +1143,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                     #endregion ESXi Host Virtual Switch Security Policy
 
                                     #region ESXi Host Virtual Switch Traffic Shaping Policy
-                                    Section -Style Heading5 'Virtual Switch Traffic Shaping' {
+                                    Section -Style Heading4 'Virtual Switch Traffic Shaping' {
                                         $VssTrafficShapingPolicy = foreach ($VSSwitch in $VSSwitches) {
                                             [PSCustomObject]@{
                                                 'Virtual Switch' = $VSSwitch.Name
@@ -1077,7 +1171,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                     $VssNicTeamingPolicy = $VSSwitches | Get-NicTeamingPolicy
                                     if ($VssNicTeamingPolicy) {
                                         #region Virtual Switch Teaming & Failover Section
-                                        Section -Style Heading5 'Virtual Switch Teaming & Failover' {
+                                        Section -Style Heading4 'Virtual Switch Teaming & Failover' {
                                             $VssNicTeaming = foreach ($VssNicTeam in $VssNicTeamingPolicy) {
                                                 [PSCustomObject]@{
                                                     'Virtual Switch' = $VssNicTeam.VirtualSwitch
@@ -1122,7 +1216,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                     #region ESXi Host Virtual Switch Port Groups
                                     $VssPortgroups = $VSSwitches | Get-VirtualPortGroup -Standard
                                     if ($VssPortgroups) {
-                                        Section -Style Heading5 'Virtual Switch Port Groups' {
+                                        Section -Style Heading4 'Virtual Switch Port Groups' {
                                             $VssPortgroups = foreach ($VssPortgroup in $VssPortgroups) {
                                                 [PSCustomObject]@{
                                                     'Port Group' = $VssPortgroup.Name
@@ -1146,7 +1240,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                         $VssPortgroupSecurity = $VSSwitches | Get-VirtualPortGroup | Get-SecurityPolicy
                                         if ($VssPortgroupSecurity) {
                                             #region Virtual Port Group Security Policy Section
-                                            Section -Style Heading5 'Virtual Switch Port Group Security' {
+                                            Section -Style Heading4 'Virtual Switch Port Group Security' {
                                                 $VssPortgroupSecurity = foreach ($VssPortgroupSec in $VssPortgroupSecurity) {
                                                     [PSCustomObject]@{
                                                         'Port Group' = $VssPortgroupSec.VirtualPortGroup
@@ -1179,7 +1273,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                         #endregion ESXi Host Virtual Switch Port Group Security Policy
 
                                         #region ESXi Host Virtual Switch Port Group Traffic Shaping Policy
-                                        Section -Style Heading5 'Virtual Switch Port Group Traffic Shaping' {
+                                        Section -Style Heading4 'Virtual Switch Port Group Traffic Shaping' {
                                             $VssPortgroupTrafficShapingPolicy = foreach ($VssPortgroup in $VssPortgroups) {
                                                 [PSCustomObject]@{
                                                     'Port Group' = $VssPortgroup.Name
@@ -1209,7 +1303,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                         $VssPortgroupNicTeaming = $VSSwitches | Get-VirtualPortGroup | Get-NicTeamingPolicy
                                         if ($VssPortgroupNicTeaming) {
                                             #region Virtual Switch Port Group Teaming & Failover Section
-                                            Section -Style Heading5 'Virtual Switch Port Group Teaming & Failover' {
+                                            Section -Style Heading4 'Virtual Switch Port Group Teaming & Failover' {
                                                 $VssPortgroupNicTeaming = foreach ($VssPortgroupNicTeam in $VssPortgroupNicTeaming) {
                                                     [PSCustomObject]@{
                                                         'Port Group' = $VssPortgroupNicTeam.VirtualPortGroup
@@ -1317,7 +1411,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                                 $TableParams = @{
                                                     Name = "$VDS Distributed Switch General Properties - $($VMHost.ExtensionData.Name)"
                                                     List = $true
-                                                    ColumnWidths = 50, 50
+                                                    ColumnWidths = 40, 60
                                                 }
                                                 if ($Report.ShowTableCaptions) {
                                                     $TableParams['Caption'] = "- $($TableParams.Name)"
@@ -1328,7 +1422,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                                 #region Distributed Switch Uplink Ports
                                                 $VdsUplinks = $VDS | Get-VDPortgroup | Where-Object { $_.IsUplink -eq $true } | Get-VDPort
                                                 if ($VdsUplinks) {
-                                                    Section -Style Heading4 'Distributed Switch Uplink Ports' {
+                                                    Section -Style NOTOCHeading5 -ExcludeFromToC 'Distributed Switch Uplink Ports' {
                                                         $VdsUplinkDetail = foreach ($VdsUplink in $VdsUplinks) {
                                                             [PSCustomObject]@{
                                                                 'Distributed Switch' = $VdsUplink.Switch
@@ -1352,7 +1446,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                                 #region Distributed Switch Port Groups
                                                 $VDSPortgroups = $VDS | Get-VDPortgroup
                                                 if ($VDSPortgroups) {
-                                                    Section -Style Heading4 'Distributed Switch Port Groups' {
+                                                    Section -Style NOTOCHeading5 -ExcludeFromToC 'Distributed Switch Port Groups' {
                                                         $VDSPortgroupDetail = foreach ($VDSPortgroup in $VDSPortgroups) {
                                                             [PSCustomObject]@{
                                                                 'Port Group' = $VDSPortgroup.Name
@@ -1379,7 +1473,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                                 #region Distributed Switch Private VLANs
                                                 $VDSwitchPrivateVLANs = $VDS | Get-VDSwitchPrivateVlan
                                                 if ($VDSwitchPrivateVLANs) {
-                                                    Section -Style Heading4 'Distributed Switch Private VLANs' {
+                                                    Section -Style -ExcludeFromTOC NOTOCNOTOCHeading5 -ExcludeFromToC 'Distributed Switch Private VLANs' {
                                                         $VDSPvlan = foreach ($VDSwitchPrivateVLAN in $VDSwitchPrivateVLANs) {
                                                             [PSCustomObject]@{
                                                                 'Primary VLAN ID' = $VDSwitchPrivateVLAN.PrimaryVlanId
@@ -1431,7 +1525,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                     $TableParams = @{
                                         Name = "Lockdown Mode - $($VMHost.ExtensionData.Name)"
                                         List = $true
-                                        ColumnWidths = 50, 50
+                                        ColumnWidths = 40, 60
                                     }
                                     if ($Report.ShowTableCaptions) {
                                         $TableParams['Caption'] = "- $($TableParams.Name)"
@@ -1570,7 +1664,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                     $TableParams = @{
                                         Name = "VM Summary - $($VMHost.ExtensionData.Name)"
                                         List = $true
-                                        ColumnWidths  = 50, 50
+                                        ColumnWidths  = 40, 60
                                     }
                                     if ($Report.ShowTableCaptions) {
                                         $TableParams['Caption'] = "- $($TableParams.Name)"
@@ -1781,7 +1875,7 @@ function Invoke-AsBuiltReport.VMware.ESXi {
                                             $TableParams = @{
                                                 Name = "$($VM.Name) VM Configuration - $($VMHost.ExtensionData.Name)"
                                                 List = $true
-                                                ColumnWidths = 50, 50
+                                                ColumnWidths = 40, 60
                                             }
                                             if ($Report.ShowTableCaptions) {
                                                 $TableParams['Caption'] = "- $($TableParams.Name)"
