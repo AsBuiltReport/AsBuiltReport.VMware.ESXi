@@ -1,29 +1,14 @@
 function Get-ESXiBootDevice {
     <#
-.NOTES
-===========================================================================
-    Created by:    William Lam
-    Organization:  VMware
-    Blog:          www.virtuallyghetto.com
-    Twitter:       @lamw
-===========================================================================
-.DESCRIPTION
-    This function identifies how an ESXi host was booted up along with its boot
-    device (if applicable). This supports both local installation to Auto Deploy as
-    well as Boot from SAN.
-.PARAMETER VMHostname
-    The name of an individual ESXi host managed by vCenter Server
-.EXAMPLE
-    Get-ESXiBootDevice
-.EXAMPLE
-    Get-ESXiBootDevice -VMHost esxi-01
-#>
-    param(
-        [Parameter(Mandatory = $false)][PSObject]$VMHost
-    )
-
+    .NOTES
+    ===========================================================================
+        Created by:    William Lam
+        Organization:  VMware
+        Blog:          www.virtuallyghetto.com
+        Twitter:       @lamw
+    ===========================================================================
+    #>
     $results = @()
-    $esxcli = Get-EsxCli -V2 -VMHost $VMHost
     $bootDetails = $esxcli.system.boot.device.get.Invoke()
 
     # Check to see if ESXi booted over the network

@@ -5,7 +5,7 @@ Function to retrieve VMware ESXi product licensing information.
 .DESCRIPTION
 Function to retrieve VMware ESXi product licensing information.
 .NOTES
-Version:        0.1.0
+Version:        0.2.0
 Author:         Tim Carman
 Twitter:        @tpcarman
 Github:         tpcarman
@@ -27,35 +27,34 @@ PS> Get-VMHostLicense -VMHost ESXi01
         [PSObject]$VMHost,
         [Parameter(Mandatory = $false, ValueFromPipeline = $false)]
         [Switch]$Licenses
-    ) 
+    )
 
     if ($VMHost) {
         $LicenseObject = @()
         $ServiceInstance = Get-View ServiceInstance -Server $ESXi
         $LicenseManager = Get-View $ServiceInstance.Content.LicenseManager -Server $ESXi
-        #$LicenseManagerAssign = Get-View $LicenseManager.LicenseAssignmentManager
-    
-        #$VMHostId = $VMHost.Extensiondata.Config.Host.Value
-        #$VMHostAssignedLicense = $LicenseManagerAssign.QueryAssignedLicenses($VMHostId)    
         $VMHostLicense = $LicenseManager.Licenses
         $VMHostLicenseExpiration = ($VMHostLicense.Properties | Where-Object { $_.Key -eq 'expirationDate' } | Select-Object Value).Value
         if ($VMHostLicense.LicenseKey -and $Options.ShowLicenseKeys) {
             $VMHostLicenseKey = $VMHostLicense.LicenseKey
         } else {
-            $VMHostLicenseKey = "*****-*****-*****" + $VMHostLicense.LicenseKey.Substring(17)
+            $keyParts = $VMHostLicense.LicenseKey -split '-'
+            $lastPart = $keyParts[-1]
+            $maskedParts = $keyParts[0..($keyParts.Length - 2)] | ForEach-Object { '*' * $_.Length }
+            $VMHostLicenseKey = ($maskedParts -join '-') + '-' + $lastPart
         }
-        $LicenseObject = [PSCustomObject]@{                               
-            Product = $VMHostLicense.Name 
+        $LicenseObject = [PSCustomObject]@{
+            Product = $VMHostLicense.Name
             LicenseKey = $VMHostLicenseKey
             Expiration =
-            if ($VMHostLicenseExpiration -eq $null) {
-                "Never" 
+            if ($null -eq $VMHostLicenseExpiration) {
+                "Never"
             } elseif ($VMHostLicenseExpiration -gt (Get-Date)) {
                 $VMHostLicenseExpiration.ToShortDateString()
             } else {
                 "Expired"
             }
         }
-    }        
+    }
     Write-Output $LicenseObject
 }
