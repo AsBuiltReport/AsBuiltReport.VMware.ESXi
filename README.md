@@ -1,6 +1,6 @@
 <p align="center">
     <a href="https://www.asbuiltreport.com/" alt="AsBuiltReport"></a>
-            <img src='https://raw.githubusercontent.com/AsBuiltReport/AsBuiltReport/master/AsBuiltReport.png' width="8%" height="8%" /></a>
+            <img src='https://github.com/AsBuiltReport.png' width="8%" height="8%" /></a>
 </p>
 <p align="center">
     <a href="https://www.powershellgallery.com/packages/AsBuiltReport.VMware.ESXi/" alt="PowerShell Gallery Version">
@@ -23,6 +23,10 @@
             <img src="https://img.shields.io/twitter/follow/AsBuiltReport.svg?style=social"/></a>
 </p>
 
+<p align="center">
+    <a href='https://ko-fi.com/B0B7DDGZ7' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://cdn.ko-fi.com/cdn/kofi1.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
+</p>
+
 # VMware ESXi As Built Report
 
 VMware ESXi As Built Report is a PowerShell module which works in conjunction with [AsBuiltReport.Core](https://github.com/AsBuiltReport/AsBuiltReport.Core).
@@ -42,14 +46,15 @@ Below are the instructions on how to install, configure and generate a VMware ES
 
 ### VMware ESXi
 The VMware ESXi As Built Report supports the following ESXi versions;
-- ESXi 6.5
-- ESXi 6.7
 - ESXi 7.0
+- ESXi 8.0
 
 #### End of Support
 The following VMware ESXi versions are no longer being tested and/or supported;
 - ESXi 5.5
 - ESXi 6.0
+- ESXi 6.5
+- ESXi 6.7
 
 ### PowerShell
 This report is compatible with the following PowerShell versions;
@@ -61,15 +66,8 @@ This report is compatible with the following PowerShell versions;
 ## :wrench: System Requirements
 PowerShell 5.1 or PowerShell 7, and the following PowerShell modules are required for generating a VMware ESXi As Built report.
 
-- [VMware PowerCLI Module](https://www.powershellgallery.com/packages/VMware.PowerCLI/)
+- [VCF PowerCLI Module](https://www.powershellgallery.com/packages/VCF.PowerCLI/)
 - [AsBuiltReport.VMware.ESXi Module](https://www.powershellgallery.com/packages/AsBuiltReport.VMware.ESXi/)
-
-### Linux & macOS
-* .NET Core is required for cover page image support on Linux and macOS operating systems.
-    * [Installing .NET Core for macOS](https://docs.microsoft.com/en-us/dotnet/core/install/macos)
-    * [Installing .NET Core for Linux](https://docs.microsoft.com/en-us/dotnet/core/install/linux)
-
-❗ If you are unable to install .NET Core, you must set `ShowCoverPageImage` to `False` in the report JSON configuration file.
 
 ### :closed_lock_with_key: Required Privileges
 A user with root privileges on the ESXi host is required to generate a VMware ESXi As Built Report.
@@ -78,10 +76,10 @@ A user with root privileges on the ESXi host is required to generate a VMware ES
 
 Open a PowerShell terminal window and install each of the required modules.
 
-:warning: VMware PowerCLI 12.3 or higher is required. Please ensure older PowerCLI versions have been uninstalled.
+:warning: VCF PowerCLI 9.0 or higher is required. Please ensure older PowerCLI versions have been uninstalled.
 
 ```powershell
-install-module VMware.PowerCLI -MinimumVersion 12.3 -AllowClobber
+install-module VCF.PowerCLI -MinimumVersion 9.0 -AllowClobber
 install-module AsBuiltReport.VMware.ESXi
 ```
 
@@ -151,40 +149,40 @@ The **VMHost** schema is used to configure health checks for VMHosts.
 
 | Sub-Schema      | Setting      | Default | Description                                                                                                              | Highlight                                                                                                                                                                                       |
 |-----------------|--------------|---------|--------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| ConnectionState | true / false | true    | Checks VMHosts connection state                                                                                          | ![Warning](https://via.placeholder.com/15/FFE860/000000?text=+) Maintenance<br>  ![Critical](https://via.placeholder.com/15/FFB38F/000000?text=+)  Disconnected                                               |
-| HyperThreading  | true / false | true    | Highlights VMHosts which have HyperThreading disabled                                                                    | ![Warning](https://via.placeholder.com/15/FFE860/000000?text=+) HyperThreading disabled<br>                                                                                                            |
-| ScratchLocation | true / false | true    | Highlights VMHosts which are configured with the default scratch location                                                | ![Warning](https://via.placeholder.com/15/FFE860/000000?text=+) Scratch location is /tmp/scratch                                                                                                       |
-| IPv6            | true / false | true    | Highlights VMHosts which do not have IPv6 enabled                                                                        | ![Warning](https://via.placeholder.com/15/FFE860/000000?text=+) IPv6 disabled                                                                                                                          |
-| UpTimeDays      | true / false | true    | Highlights VMHosts with uptime days greater than 9 months                                                                | ![Warning](https://via.placeholder.com/15/FFE860/000000?text=+) 9 - 12 months<br> ![Critical](https://via.placeholder.com/15/FFB38F/000000?text=+)  >12 months                                                |
-| Licensing       | true / false | true    | Highlights VMHosts which are using production evaluation licenses                                                        | ![Warning](https://via.placeholder.com/15/FFE860/000000?text=+) Product evaluation license in use                                                                                                      |
-| SSH             | true / false | true    | Highlights if the SSH service is enabled                                                                                 | ![Warning](https://via.placeholder.com/15/FFE860/000000?text=+) TSM / TSM-SSH service enabled                                                                                                          |
-| ESXiShell       | true / false | true    | Highlights if the ESXi Shell service is enabled                                                                          | ![Warning](https://via.placeholder.com/15/FFE860/000000?text=+) TSM / TSM-EsxiShell service enabled                                                                                                    |
-| NTP             | true / false | true    | Highlights if the NTP service has stopped or is disabled on a VMHost                                                     | ![Critical](https://via.placeholder.com/15/FFB38F/000000?text=+)  NTP service stopped / disabled                                                                                                       |
-| StorageAdapter  | true / false | true    | Highlights storage adapters which are not 'Online'                                                                       | ![Warning](https://via.placeholder.com/15/FFE860/000000?text=+) Storage adapter status is 'Unknown'<br> ![Critical](https://via.placeholder.com/15/FFB38F/000000?text=+)  Storage adapter status is 'Offline' |
-| NetworkAdapter  | true / false | true    | Highlights physical network adapters which are not 'Connected'<br> Highlights physical network adapters which are 'Down' | ![Critical](https://via.placeholder.com/15/FFB38F/000000?text=+)  Network adapter is 'Disconnected'<br> ![Critical](https://via.placeholder.com/15/FFB38F/000000?text=+)  Network adapter is 'Down'           |
-| LockdownMode    | true / false | true    | Highlights VMHosts which do not have Lockdown mode enabled                                                               | ![Warning](https://via.placeholder.com/15/FFE860/000000?text=+) Lockdown Mode disabled<br>                                                                                                             |
+| ConnectionState | true / false | true    | Checks VMHosts connection state                                                                                          | ![Warning](https://place-hold.it/15/ffe860/ffe860) Maintenance<br>  ![Critical](https://place-hold.it/15/ffb38f/ffb38f)  Disconnected                                               |
+| HyperThreading  | true / false | true    | Highlights VMHosts which have HyperThreading disabled                                                                    | ![Warning](https://place-hold.it/15/ffe860/ffe860) HyperThreading disabled<br>                                                                                                            |
+| ScratchLocation | true / false | true    | Highlights VMHosts which are configured with the default scratch location                                                | ![Warning](https://place-hold.it/15/ffe860/ffe860) Scratch location is /tmp/scratch                                                                                                       |
+| IPv6            | true / false | true    | Highlights VMHosts which do not have IPv6 enabled                                                                        | ![Warning](https://place-hold.it/15/ffe860/ffe860) IPv6 disabled                                                                                                                          |
+| UpTimeDays      | true / false | true    | Highlights VMHosts with uptime days greater than 9 months                                                                | ![Warning](https://place-hold.it/15/ffe860/ffe860) 9 - 12 months<br> ![Critical](https://place-hold.it/15/ffb38f/ffb38f)  >12 months                                                |
+| Licensing       | true / false | true    | Highlights VMHosts which are using production evaluation licenses                                                        | ![Warning](https://place-hold.it/15/ffe860/ffe860) Product evaluation license in use                                                                                                      |
+| SSH             | true / false | true    | Highlights if the SSH service is enabled                                                                                 | ![Warning](https://place-hold.it/15/ffe860/ffe860) TSM / TSM-SSH service enabled                                                                                                          |
+| ESXiShell       | true / false | true    | Highlights if the ESXi Shell service is enabled                                                                          | ![Warning](https://place-hold.it/15/ffe860/ffe860) TSM / TSM-EsxiShell service enabled                                                                                                    |
+| NTP             | true / false | true    | Highlights if the NTP service has stopped or is disabled on a VMHost                                                     | ![Critical](https://place-hold.it/15/ffb38f/ffb38f)  NTP service stopped / disabled                                                                                                       |
+| StorageAdapter  | true / false | true    | Highlights storage adapters which are not 'Online'                                                                       | ![Warning](https://place-hold.it/15/ffe860/ffe860) Storage adapter status is 'Unknown'<br> ![Critical](https://place-hold.it/15/ffb38f/ffb38f)  Storage adapter status is 'Offline' |
+| NetworkAdapter  | true / false | true    | Highlights physical network adapters which are not 'Connected'<br> Highlights physical network adapters which are 'Down' | ![Critical](https://place-hold.it/15/ffb38f/ffb38f)  Network adapter is 'Disconnected'<br> ![Critical](https://place-hold.it/15/ffb38f/ffb38f)  Network adapter is 'Down'           |
+| LockdownMode    | true / false | true    | Highlights VMHosts which do not have Lockdown mode enabled                                                               | ![Warning](https://place-hold.it/15/ffe860/ffe860) Lockdown Mode disabled<br>                                                                                                             |
 
 #### Datastore
 The **Datastore** schema is used to configure health checks for Datastores.
 
 | Sub-Schema          | Setting      | Default | Description                                                      | Highlight                                                                                                                                              |
 |---------------------|--------------|---------|------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
-| CapacityUtilization | true / false | true    | Highlights datastores with storage capacity utilization over 75% | ![Warning](https://via.placeholder.com/15/FFE860/000000?text=+) 75 - 90% utilized<br> ![Critical](https://via.placeholder.com/15/FFB38F/000000?text=+) >90% utilized |
+| CapacityUtilization | true / false | true    | Highlights datastores with storage capacity utilization over 75% | ![Warning](https://place-hold.it/15/ffe860/ffe860) 75 - 90% utilized<br> ![Critical](https://place-hold.it/15/ffb38f/ffb38f) >90% utilized |
 
 #### VM
 The **VM** schema is used to configure health checks for virtual machines.
 
 | Sub-Schema           | Setting      | Default | Description                                                                                          | Highlight                                                                                                                                                                                                           |
 |----------------------|--------------|---------|------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| PowerState           | true / false | true    | Highlights VMs which are powered off                                                                 | ![Warning](https://via.placeholder.com/15/FFE860/000000?text=+) VM is powered off                                                                                                                                          |
-| ConnectionState      | true / false | true    | Highlights VMs which are orphaned or inaccessible                                                    | ![Critical](https://via.placeholder.com/15/FFB38F/000000?text=+) VM is orphaned or inaccessible                                                                                                                            |
-| CpuHotAdd            | true / false | true    | Highlights virtual machines which have CPU Hot Add enabled                                           | ![Warning](https://via.placeholder.com/15/FFE860/000000?text=+) CPU Hot Add enabled                                                                                                                                        |
-| CpuHotRemove         | true / false | true    | Highlights virtual machines which have CPU Hot Remove enabled                                        | ![Warning](https://via.placeholder.com/15/FFE860/000000?text=+) CPU Hot Remove enabled                                                                                                                                     |
-| MemoryHotAdd         | true / false | true    | Highlights VMs which have Memory Hot Add enabled                                                     | ![Warning](https://via.placeholder.com/15/FFE860/000000?text=+) Memory Hot Add enabled                                                                                                                                     |
-| ChangeBlockTracking  | true / false | true    | Highlights VMs which do not have Change Block Tracking enabled                                       | ![Warning](https://via.placeholder.com/15/FFE860/000000?text=+) Change Block Tracking disabled                                                                                                                             |
-| SpbmPolicyCompliance | true / false | true    | Highlights VMs which do not comply with storage based policies                                       | ![Warning](https://via.placeholder.com/15/FFE860/000000?text=+) VM storage based policy compliance is unknown<br> ![Critical](https://via.placeholder.com/15/FFB38F/000000?text=+) VM does not comply with storage based policies |
-| VMToolsStatus        | true / false | true    | Highlights Virtual Machines which do not have VM Tools installed, are out of date or are not running | ![Warning](https://via.placeholder.com/15/FFE860/000000?text=+) VM Tools not installed, out of date or not running                                                                                                         |
-| VMSnapshots          | true / false | true    | Highlights Virtual Machines which have snapshots older than 7 days                                   | ![Warning](https://via.placeholder.com/15/FFE860/000000?text=+) VM Snapshot age >= 7 days<br> ![Critical](https://via.placeholder.com/15/FFB38F/000000?text=+) VM Snapshot age >= 14 days                                         |
+| PowerState           | true / false | true    | Highlights VMs which are powered off                                                                 | ![Warning](https://place-hold.it/15/ffe860/ffe860) VM is powered off                                                                                                                                          |
+| ConnectionState      | true / false | true    | Highlights VMs which are orphaned or inaccessible                                                    | ![Critical](https://place-hold.it/15/ffb38f/ffb38f) VM is orphaned or inaccessible                                                                                                                            |
+| CpuHotAdd            | true / false | true    | Highlights virtual machines which have CPU Hot Add enabled                                           | ![Warning](https://place-hold.it/15/ffe860/ffe860) CPU Hot Add enabled                                                                                                                                        |
+| CpuHotRemove         | true / false | true    | Highlights virtual machines which have CPU Hot Remove enabled                                        | ![Warning](https://place-hold.it/15/ffe860/ffe860) CPU Hot Remove enabled                                                                                                                                     |
+| MemoryHotAdd         | true / false | true    | Highlights VMs which have Memory Hot Add enabled                                                     | ![Warning](https://place-hold.it/15/ffe860/ffe860) Memory Hot Add enabled                                                                                                                                     |
+| ChangeBlockTracking  | true / false | true    | Highlights VMs which do not have Change Block Tracking enabled                                       | ![Warning](https://place-hold.it/15/ffe860/ffe860) Change Block Tracking disabled                                                                                                                             |
+| SpbmPolicyCompliance | true / false | true    | Highlights VMs which do not comply with storage based policies                                       | ![Warning](https://place-hold.it/15/ffe860/ffe860) VM storage based policy compliance is unknown<br> ![Critical](https://place-hold.it/15/ffb38f/ffb38f) VM does not comply with storage based policies |
+| VMToolsStatus        | true / false | true    | Highlights Virtual Machines which do not have VM Tools installed, are out of date or are not running | ![Warning](https://place-hold.it/15/ffe860/ffe860) VM Tools not installed, out of date or not running                                                                                                         |
+| VMSnapshots          | true / false | true    | Highlights Virtual Machines which have snapshots older than 7 days                                   | ![Warning](https://place-hold.it/15/ffe860/ffe860) VM Snapshot age >= 7 days<br> ![Critical](https://place-hold.it/15/ffb38f/ffb38f) VM Snapshot age >= 14 days                                         |
 
 ## :computer: Examples
 

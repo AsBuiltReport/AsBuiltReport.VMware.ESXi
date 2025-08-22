@@ -76,7 +76,7 @@ function Get-VMHostNetworkAdapterDP {
                 }
             }
         } catch [Exception] {
-            throw 'Unable to retrieve CDP/LLDP info'
+            Write-PScriboMessage -IsWarning 'Unable to retrieve CDP/LLDP info'
         }
     }
     end {
